@@ -3,19 +3,6 @@ use super::errors::*;
 use std::io::{Read, Seek, SeekFrom};
 use std::fmt;
 
-pub const SECTOR_SIZE: usize = 2048;
-
-pub struct Sector(pub [u8; SECTOR_SIZE]);
-
-impl Sector {
-    pub fn read_sector<R: Read + Seek>(reader: &mut R, sector: usize) -> Result<Sector>{
-        let mut output = Sector([0; SECTOR_SIZE]);
-        reader.seek(SeekFrom::Start(((sector-1)*SECTOR_SIZE) as u64)).chain_err(|| "Failed to seek")?;
-        reader.read_exact(&mut output.0).chain_err(|| "Failed to read sector")?;
-        Ok(output)
-    }
-}
-
 pub struct Region {
     /// Number of the region, starting from 0
     pub id: u32,
@@ -35,7 +22,7 @@ impl Region {
 
 impl fmt::Debug for Region {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Region({}, [{}, {}], {})",
+        write!(f, "Region({}, [{:#X}, {:#X}], {})",
                self.id,
                self.start,
                self.end,

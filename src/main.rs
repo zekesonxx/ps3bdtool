@@ -49,6 +49,7 @@ fn run() -> Result<()> {
     println!();
 
 //    println!("{:?}", disc);
+//    println!("region for 2954048: {:?}", disc.regions.region_for_sector(2954048));
 //    let sec5000: Vec<u8> = disc.read_sector(2954048).chain_err(|| "shit fucked up")?;
 //    io::stdout().write(sec5000.as_ref());
 

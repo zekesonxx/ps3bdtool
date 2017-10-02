@@ -62,7 +62,7 @@ impl<F: Read+Seek> PS3Disc<F> {
         Ok(PS3Disc {
             region_count: regions.len() as u32,
             regions: regions,
-            total_sectors: last_sector_ended_at,
+            total_sectors: last_sector_ended_at+1,
             disc_key: d1,
             gameid: game_id.to_string(),
             f70_tagline: f70_tagline.to_string(),
@@ -72,11 +72,13 @@ impl<F: Read+Seek> PS3Disc<F> {
 
     pub fn read_sector(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
-        &self.reader_handle.seek(SeekFrom::Start((sector*2048) as u64))
+        &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
             .chain_err(|| "failed to seek")?;
         &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
 
         if self.regions.region_for_sector(sector).unwrap().encrypted {
+            let mut shifting = sector as u32;
+            // code courtesy of the PS3DevWiki.
             let mut iV = [0u8; 16];
             iV[12] = ((sector & 0xFF000000)>>24) as u8;
             iV[13] = ((sector & 0x00FF0000)>>16) as u8;

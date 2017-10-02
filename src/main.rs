@@ -11,7 +11,7 @@ mod decrypt;
 
 use std::fs::File;
 use std::io;
-use std::io::{BufReader, Write, Read};
+use std::io::{BufReader, BufWriter, Write, Read};
 
 use sector::{Region, VecRegion};
 
@@ -36,9 +36,21 @@ fn run() -> Result<()> {
     let mut reader = BufReader::new(f);
 
     let mut disc = disc::PS3Disc::new(reader)?;
-    //println!("{:?}", disc);
-    let sec5000: Vec<u8> = disc.read_sector(4352).chain_err(|| "shit fucked up")?;
-    io::stdout().write(sec5000.as_ref());
+
+    let mut fout = File::create("LegendsOfRock.dec.iso").chain_err(|| "Failed to create file")?;
+    let mut writer = BufWriter::new(fout);
+
+    println!("sectors: {} ({} bytes)", disc.total_sectors, (disc.total_sectors) as u64*2048);
+
+    for i in 0..disc.total_sectors {
+        writer.write_all(disc.read_sector(i).chain_err(|| "failed to read something")?.as_ref()).chain_err(|| "failed to write something")?;
+        print!("\r{}/{} ({}%)", i, disc.total_sectors, ((i as f64)/(disc.total_sectors as f64)*100f64).floor());
+    }
+    println!();
+
+//    println!("{:?}", disc);
+//    let sec5000: Vec<u8> = disc.read_sector(2954048).chain_err(|| "shit fucked up")?;
+//    io::stdout().write(sec5000.as_ref());
 
     Ok(())
 }

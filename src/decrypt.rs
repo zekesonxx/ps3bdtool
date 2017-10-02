@@ -1,7 +1,7 @@
 
 use super::errors::*;
-use crypto::{ symmetriccipher, buffer, aes, blockmodes };
-use crypto::buffer::{ ReadBuffer, WriteBuffer, BufferResult };
+use crypto::{buffer, aes, blockmodes};
+use crypto::buffer::{ReadBuffer, WriteBuffer, BufferResult};
 
 pub fn aes_encrypt(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut encryptor = aes::cbc_encryptor(
@@ -60,6 +60,7 @@ pub fn aes_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
 }
 
 /// Calculate a disc encryption key, given the disc's d1
+#[allow(non_upper_case_globals)]
 pub fn disc_key(d1: &[u8]) -> Result<Vec<u8>> {
     //keys obtained from PS3DevWiki
     // key_2:   380BCF0B53455B3C7817AB4FA3BA90ED

@@ -1,6 +1,5 @@
 
-use super::errors::*;
-use std::io::{Read, Seek, SeekFrom};
+//use super::errors::*;
 use std::fmt;
 
 pub struct Region {

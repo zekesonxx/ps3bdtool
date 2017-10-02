@@ -109,6 +109,7 @@ impl<F: Read+Seek> PS3Disc<F> {
     /// Read a sector, automatically decrypting if needed
     ///
     /// Remember that sector is 0 indexed, so the first sector is #0.
+    #[allow(non_snake_case)]
     pub fn read_sector(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
         &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))

@@ -10,10 +10,7 @@ pub mod disc;
 pub mod decrypt;
 
 use std::fs::File;
-use std::io;
-use std::io::{BufReader, BufWriter, Write, Read};
-
-use sector::{Region, VecRegion};
+use std::io::{BufReader, BufWriter, Write};
 
 pub mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -32,12 +29,12 @@ use errors::*;
 quick_main!(run);
 
 fn run() -> Result<()> {
-    let mut f = File::open("LegendsOfRock.iso").chain_err(|| "Failed to open file")?;
-    let mut reader = BufReader::new(f);
+    let f = File::open("LegendsOfRock.iso").chain_err(|| "Failed to open file")?;
+    let reader = BufReader::new(f);
 
     let mut disc = disc::PS3Disc::new(reader)?;
 
-    let mut fout = File::create("LegendsOfRock.dec.iso").chain_err(|| "Failed to create file")?;
+    let fout = File::create("LegendsOfRock.dec.iso").chain_err(|| "Failed to create file")?;
     let mut writer = BufWriter::new(fout);
 
     println!("sectors: {} ({} bytes)", disc.total_sectors, (disc.total_sectors) as u64*2048);

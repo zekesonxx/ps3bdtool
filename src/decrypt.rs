@@ -60,8 +60,10 @@ pub fn aes_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
 }
 
 pub fn disc_key(d1: &[u8]) -> Result<Vec<u8>> {
-    //TODO lookup these keys properly from somewhere
+    //keys obtained from PS3DevWiki
+    // key_2:   380BCF0B53455B3C7817AB4FA3BA90ED
     const key: [u8; 16] = [56, 11, 207, 11, 83, 69, 91, 60, 120, 23, 171, 79, 163, 186, 144, 237];
+    // iv_2:    69474772AF6FDAB342743AEFAA186287
     const iV: [u8; 16] = [105, 71, 71, 114, 175, 111, 218, 179, 66, 116, 58, 239, 170, 24, 98, 135];
     aes_encrypt(d1, &key, &iV)
 }

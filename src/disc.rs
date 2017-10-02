@@ -2,6 +2,7 @@
 use super::errors::*;
 use sector::{Region, VecRegion};
 use std::io::{Read, Seek, SeekFrom};
+use decrypt;
 
 fn be_u32(i: &[u8]) -> u32 {
     ((i[0] as u32) << 24) + ((i[1] as u32) << 16) + ((i[2] as u32) << 8) + i[3] as u32
@@ -12,7 +13,7 @@ pub struct PS3Disc<F> {
     pub region_count: u32,
     pub regions: Vec<Region>,
     pub total_sectors: u32,
-    pub disc_key_maybe_idunno: [u8; 16],
+    pub disc_key: [u8; 16],
     pub gameid: String,
     pub f70_tagline: String,
     pub reader_handle: F
@@ -33,7 +34,8 @@ impl<F: Read+Seek> PS3Disc<F> {
         let game_id = game_id.trim_right();
 
         let mut d1 = [0u8; 16];
-        d1.copy_from_slice(&header[3968..(3968+16)]);
+        let disc_key: Vec<u8> = decrypt::disc_key(&header[3968..(3968+16)]).chain_err(|| "Failed to generate disc key")?;
+        d1.copy_from_slice(disc_key.as_slice());
 
         // Get the sectors
 
@@ -61,10 +63,28 @@ impl<F: Read+Seek> PS3Disc<F> {
             region_count: regions.len() as u32,
             regions: regions,
             total_sectors: last_sector_ended_at,
-            disc_key_maybe_idunno: d1,
+            disc_key: d1,
             gameid: game_id.to_string(),
             f70_tagline: f70_tagline.to_string(),
             reader_handle: handle
         })
+    }
+
+    pub fn read_sector(&mut self, sector: u32) -> Result<Vec<u8>> {
+        let mut buf = [0u8; 2048];
+        &self.reader_handle.seek(SeekFrom::Start((sector*2048) as u64))
+            .chain_err(|| "failed to seek")?;
+        &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
+
+        if self.regions.region_for_sector(sector).unwrap().encrypted {
+            let mut iV = [0u8; 16];
+            iV[12] = ((sector & 0xFF000000)>>24) as u8;
+            iV[13] = ((sector & 0x00FF0000)>>16) as u8;
+            iV[14] = ((sector & 0x0000FF00)>> 8) as u8;
+            iV[15] = ((sector & 0x000000FF)>> 0) as u8;
+            decrypt::aes_decrypt(&buf, &self.disc_key, &iV)
+        } else {
+            Ok(buf.to_owned())
+        }
     }
 }

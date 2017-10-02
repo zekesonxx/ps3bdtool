@@ -36,7 +36,9 @@ fn run() -> Result<()> {
     let mut reader = BufReader::new(f);
 
     let mut disc = disc::PS3Disc::new(reader)?;
-    println!("{:?}", disc);
+    //println!("{:?}", disc);
+    let sec5000: Vec<u8> = disc.read_sector(4352).chain_err(|| "shit fucked up")?;
+    io::stdout().write(sec5000.as_ref());
 
     Ok(())
 }

@@ -4,11 +4,8 @@ use crypto::{ symmetriccipher, buffer, aes, blockmodes };
 use crypto::buffer::{ ReadBuffer, WriteBuffer, BufferResult };
 
 pub fn aes_encrypt(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
-
-    // Create an encryptor instance of the best performing
-    // type available for the platform.
     let mut encryptor = aes::cbc_encryptor(
-        aes::KeySize::KeySize256,
+        aes::KeySize::KeySize128,
         key,
         iv,
         blockmodes::NoPadding);
@@ -37,7 +34,7 @@ pub fn aes_encrypt(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
 
 pub fn aes_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut decryptor = aes::cbc_decryptor(
-        aes::KeySize::KeySize256,
+        aes::KeySize::KeySize128,
         key,
         iv,
         blockmodes::NoPadding);
@@ -66,5 +63,5 @@ pub fn disc_key(d1: &[u8]) -> Result<Vec<u8>> {
     //TODO lookup these keys properly from somewhere
     const key: [u8; 16] = [56, 11, 207, 11, 83, 69, 91, 60, 120, 23, 171, 79, 163, 186, 144, 237];
     const iV: [u8; 16] = [105, 71, 71, 114, 175, 111, 218, 179, 66, 116, 58, 239, 170, 24, 98, 135];
-    aes_encrypt(&key, &iV, d1)
+    aes_encrypt(d1, &key, &iV)
 }

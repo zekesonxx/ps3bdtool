@@ -16,26 +16,26 @@ impl Sector {
     }
 }
 
-pub struct SectorRange {
-    /// Number of the range, starting from 0
+pub struct Region {
+    /// Number of the region, starting from 0
     pub id: u32,
-    /// Start of the range. Inclusive
+    /// Start of the region. Inclusive
     pub start: u32,
-    /// End of the range. Inclusive
+    /// End of the region. Inclusive
     pub end: u32,
     /// Is the range encrypted or not
     pub encrypted: bool
 }
 
-impl SectorRange {
-    pub fn within_range(&self, sector: u32) -> bool {
+impl Region {
+    pub fn within_region(&self, sector: u32) -> bool {
         (self.start <= sector) && (sector <= self.end)
     }
 }
 
-impl fmt::Debug for SectorRange {
+impl fmt::Debug for Region {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SectorRange({}, [{}, {}], {})",
+        write!(f, "Region({}, [{}, {}], {})",
                self.id,
                self.start,
                self.end,
@@ -43,14 +43,14 @@ impl fmt::Debug for SectorRange {
     }
 }
 
-pub trait VecSectorRange {
-    fn range_for_sector(&self, sector: u32) -> Option<&SectorRange>;
+pub trait VecRegion {
+    fn region_for_sector(&self, sector: u32) -> Option<&Region>;
 }
 
-impl VecSectorRange for Vec<SectorRange> {
-    fn range_for_sector(&self, sector: u32) -> Option<&SectorRange> {
+impl VecRegion for Vec<Region> {
+    fn region_for_sector(&self, sector: u32) -> Option<&Region> {
         for range in self {
-            if range.within_range(sector) {
+            if range.within_region(sector) {
                 return Some(range);
             }
         }

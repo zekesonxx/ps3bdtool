@@ -2,15 +2,17 @@
 #![recursion_limit = "1024"]
 
 #[macro_use] extern crate error_chain;
-#[macro_use] extern crate nom;
+//#[macro_use] extern crate nom;
+extern crate crypto;
 
 mod sector;
+mod disc;
 
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, Write, Read};
 
-use sector::{SectorRange, VecSectorRange};
+use sector::{Region, VecRegion};
 
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -27,6 +29,16 @@ fn be_u32(i: &[u8]) -> u32 {
 
 
 fn run() -> Result<()> {
+    let mut f = File::open("LegendsOfRock.iso").chain_err(|| "Failed to open file")?;
+    let mut reader = BufReader::new(f);
+
+    let mut disc = disc::PS3Disc::new(reader);
+    println!("{:?}", disc);
+
+    Ok(())
+}
+
+fn old_run() -> Result<()> {
 
     let mut f = File::open("LegendsOfRock.iso").chain_err(|| "Failed to open file")?;
     let mut reader = BufReader::new(f);
@@ -40,7 +52,7 @@ fn run() -> Result<()> {
     println!("num total sectors: {}", num_sectors);
 
     let game_id = String::from_utf8_lossy(&header[2064..(2064+20)]);
-    println!("game id: \"{}\"", game_id);
+    println!("game id: \"{}\"", game_id.trim_right());
 
     let mut num = 8usize;
     let mut start_sector = be_u32(&header[num..(num+4)]) as u64;
@@ -49,14 +61,14 @@ fn run() -> Result<()> {
     let mut next_sector_encrypted = false;
     let mut last_sector_ended_at = 0;
 
-    let mut sectors: Vec<SectorRange> = vec![];
+    let mut sectors: Vec<Region> = vec![];
 
     for num2 in 0..num_sectors {
         let sector_start = if last_sector_ended_at == 0 {0} else {last_sector_ended_at+1};
         let sector_end= be_u32(&header[num..(num+4)]);
         last_sector_ended_at = sector_end;
         num += 4;
-        sectors.push(SectorRange {
+        sectors.push(Region {
             id: num2,
             start: sector_start,
             end: sector_end,
@@ -66,9 +78,11 @@ fn run() -> Result<()> {
     }
     println!("sectors: {:?}", sectors);
 
-    println!("sector for 5000: {:?}", sectors.range_for_sector(5000));
+    println!("sector for 5000: {:?}", sectors.region_for_sector(5000));
 
-    println!("0xF70 tagline: {}", String::from_utf8_lossy(&header[0xF70..0xFC4]));
+    println!("0xF70 tagline: {}", String::from_utf8_lossy(&header[0xF70..(0xF70+16)]));
+
+    let d1 = &header[3968..(3968+16)];
 
 
     Ok(())

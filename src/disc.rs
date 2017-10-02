@@ -19,9 +19,9 @@ pub struct PS3Disc<F> {
 }
 
 impl<F: Read+Seek> PS3Disc<F> {
-    pub fn new(mut handle: F) -> Self {
+    pub fn new(mut handle: F) -> Result<Self> {
         let mut header = [0; 4096];
-        handle.read_exact(&mut header);
+        handle.read_exact(&mut header).chain_err(|| "Failed to read disc header")?;
 
         let num_normal_regions= be_u32(&header[0..4]);
 
@@ -38,7 +38,6 @@ impl<F: Read+Seek> PS3Disc<F> {
         // Get the sectors
 
         let mut num = 8usize;
-        let mut start_sector = be_u32(&header[num..(num+4)]) as u64;
         num += 4;
 
         let mut next_sector_encrypted = false;
@@ -58,7 +57,7 @@ impl<F: Read+Seek> PS3Disc<F> {
             next_sector_encrypted = !next_sector_encrypted;
         }
 
-        PS3Disc {
+        Ok(PS3Disc {
             region_count: regions.len() as u32,
             regions: regions,
             total_sectors: last_sector_ended_at,
@@ -66,6 +65,6 @@ impl<F: Read+Seek> PS3Disc<F> {
             gameid: game_id.to_string(),
             f70_tagline: f70_tagline.to_string(),
             reader_handle: handle
-        }
+        })
     }
 }

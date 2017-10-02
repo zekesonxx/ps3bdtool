@@ -7,6 +7,7 @@ extern crate crypto;
 
 mod sector;
 mod disc;
+mod decrypt;
 
 use std::fs::File;
 use std::io;
@@ -14,76 +15,28 @@ use std::io::{BufReader, Write, Read};
 
 use sector::{Region, VecRegion};
 
-mod errors {
+pub mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain!{}
+    error_chain!{
+        errors {
+            SymmetricCipherError(t: ::crypto::symmetriccipher::SymmetricCipherError) {
+                description("rust-crypto SymmetricCipherError")
+                display("{:?}", t)
+            }
+        }
+    }
 }
 
 use errors::*;
 
 quick_main!(run);
 
-fn be_u32(i: &[u8]) -> u32 {
-    ((i[0] as u32) << 24) + ((i[1] as u32) << 16) + ((i[2] as u32) << 8) + i[3] as u32
-}
-
-
 fn run() -> Result<()> {
     let mut f = File::open("LegendsOfRock.iso").chain_err(|| "Failed to open file")?;
     let mut reader = BufReader::new(f);
 
-    let mut disc = disc::PS3Disc::new(reader);
+    let mut disc = disc::PS3Disc::new(reader)?;
     println!("{:?}", disc);
-
-    Ok(())
-}
-
-fn old_run() -> Result<()> {
-
-    let mut f = File::open("LegendsOfRock.iso").chain_err(|| "Failed to open file")?;
-    let mut reader = BufReader::new(f);
-
-    let mut header = [0; 4096];
-    reader.read_exact(&mut header);
-
-    let normal_sectors= be_u32(&header[0..4]);
-    println!("num normal sectors: {}", normal_sectors);
-    let num_sectors = (normal_sectors * 2) - 1;
-    println!("num total sectors: {}", num_sectors);
-
-    let game_id = String::from_utf8_lossy(&header[2064..(2064+20)]);
-    println!("game id: \"{}\"", game_id.trim_right());
-
-    let mut num = 8usize;
-    let mut start_sector = be_u32(&header[num..(num+4)]) as u64;
-    num += 4;
-
-    let mut next_sector_encrypted = false;
-    let mut last_sector_ended_at = 0;
-
-    let mut sectors: Vec<Region> = vec![];
-
-    for num2 in 0..num_sectors {
-        let sector_start = if last_sector_ended_at == 0 {0} else {last_sector_ended_at+1};
-        let sector_end= be_u32(&header[num..(num+4)]);
-        last_sector_ended_at = sector_end;
-        num += 4;
-        sectors.push(Region {
-            id: num2,
-            start: sector_start,
-            end: sector_end,
-            encrypted: next_sector_encrypted
-        });
-        next_sector_encrypted = !next_sector_encrypted;
-    }
-    println!("sectors: {:?}", sectors);
-
-    println!("sector for 5000: {:?}", sectors.region_for_sector(5000));
-
-    println!("0xF70 tagline: {}", String::from_utf8_lossy(&header[0xF70..(0xF70+16)]));
-
-    let d1 = &header[3968..(3968+16)];
-
 
     Ok(())
 }

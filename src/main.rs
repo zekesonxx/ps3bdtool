@@ -5,9 +5,9 @@
 //#[macro_use] extern crate nom;
 extern crate crypto;
 
-mod sector;
-mod disc;
-mod decrypt;
+pub mod sector;
+pub mod disc;
+pub mod decrypt;
 
 use std::fs::File;
 use std::io;

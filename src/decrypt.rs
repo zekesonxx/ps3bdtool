@@ -59,6 +59,7 @@ pub fn aes_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
     Ok(final_result)
 }
 
+/// Calculate a disc encryption key, given the disc's d1
 pub fn disc_key(d1: &[u8]) -> Result<Vec<u8>> {
     //keys obtained from PS3DevWiki
     // key_2:   380BCF0B53455B3C7817AB4FA3BA90ED

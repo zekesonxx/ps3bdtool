@@ -4,10 +4,15 @@ use sector::{Region, VecRegion};
 use std::io::{Read, Seek, SeekFrom};
 use decrypt;
 
+/// given a four-element &[u8], calculate the big-endian u32 that they represent
+/// shamelessly taken out of nom
 fn be_u32(i: &[u8]) -> u32 {
     ((i[0] as u32) << 24) + ((i[1] as u32) << 16) + ((i[2] as u32) << 8) + i[3] as u32
 }
 
+/// Wrapped PS3 disc
+///
+/// Using read_sector, will transparently decrypt sectors as needed.
 #[derive(Debug)]
 pub struct PS3Disc<F> {
     /// Encrypted and unencrypted areas of the disc, specified by sectors.
@@ -16,11 +21,12 @@ pub struct PS3Disc<F> {
     pub total_sectors: u32,
     /// The disc's d1 key, if present. This is used to generate the disc key.
     pub d1: [u8; 16],
-    /// 128-bit AES key used to encrypt the sectors, along with a per-sector iV
+    /// 128-bit AES key used to decrypt the sectors, along with a per-sector iV
     pub disc_key: [u8; 16],
     /// PlayStation Game ID, ex BCUS-12345
     pub gameid: String,
     /// 3k3y Tagline, which may or may not be present, ex "Encrypted 3K BLD"
+    ///
     /// If this is present, it will be automatically rewritten to "Decrypted" when sector 1 (the second sector) is read
     pub tagline_3k3y: Option<String>,
     /// File handle used to read the disc
@@ -28,6 +34,8 @@ pub struct PS3Disc<F> {
 }
 
 impl<F: Read+Seek> PS3Disc<F> {
+    /// Create a new PS3Disc
+    //TODO handle the disc key not existing
     pub fn new(mut handle: F) -> Result<Self> {
         // Read the first two sectors (disc sectors are 2KiB)
         // Sector 0 contains the region information (as in, encrypted sectors, not region coding)
@@ -45,7 +53,7 @@ impl<F: Read+Seek> PS3Disc<F> {
         // Get the 3k3y tagline, if it exists.
         // This immediately proceeds the ird-injected d1 key, which is used to generate the disc key
         //TODO when IRD files are implemented, fix this part.
-        let mut f70 = &header[0xF70..(0xF70+16)];
+        let f70 = &header[0xF70..(0xF70+16)];
         let tagline_3k3y = if f70 == &[0u8; 16] {
             None
         } else {
@@ -98,6 +106,9 @@ impl<F: Read+Seek> PS3Disc<F> {
         })
     }
 
+    /// Read a sector, automatically decrypting if needed
+    ///
+    /// Remember that sector is 0 indexed, so the first sector is #0.
     pub fn read_sector(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
         &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))

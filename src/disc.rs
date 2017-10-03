@@ -20,9 +20,9 @@ pub struct PS3Disc<F> {
     /// Total number of sectors on the disc
     pub total_sectors: u32,
     /// The disc's d1 key, if present. This is used to generate the disc key.
-    pub d1: [u8; 16],
+    pub d1: Option<[u8; 16]>,
     /// 128-bit AES key used to decrypt the sectors, along with a per-sector iV
-    pub disc_key: [u8; 16],
+    pub disc_key: Option<[u8; 16]>,
     /// PlayStation Game ID, ex BCUS-12345
     pub gameid: String,
     /// 3k3y Tagline, which may or may not be present, ex "Encrypted 3K BLD"
@@ -67,11 +67,14 @@ impl<F: Read+Seek> PS3Disc<F> {
         // Get the encrypted (decrypted...?) disc key
         let mut d1 = [0u8; 16];
         d1.copy_from_slice(&header[3968..(3968+16)]);
-
-        // Calculate the disc key from d1
-        let mut disc_key_arr = [0u8; 16];
-        let disc_key: Vec<u8> = decrypt::disc_key(&d1).chain_err(|| "Failed to generate disc key")?;
-        disc_key_arr.copy_from_slice(disc_key.as_slice());
+        let (d1, disc_key) = if d1 == [0; 16] {
+            (None, None)
+        } else {
+            let mut disc_key_arr = [0u8; 16];
+            let disc_key: Vec<u8> = decrypt::disc_key(&d1).chain_err(|| "Failed to generate disc key")?;
+            disc_key_arr.copy_from_slice(disc_key.as_slice());
+            (Some(d1), Some(disc_key_arr))
+        };
 
         // Get the region list
         let mut regions: Vec<Region> = vec![];
@@ -99,7 +102,7 @@ impl<F: Read+Seek> PS3Disc<F> {
             regions: regions,
             total_sectors: start_sector+1,
             d1: d1,
-            disc_key: disc_key_arr,
+            disc_key: disc_key,
             gameid: game_id.to_string(),
             tagline_3k3y: tagline_3k3y,
             reader_handle: handle
@@ -123,7 +126,7 @@ impl<F: Read+Seek> PS3Disc<F> {
             iV[13] = ((sector & 0x00FF0000)>>16) as u8;
             iV[14] = ((sector & 0x0000FF00)>> 8) as u8;
             iV[15] = ((sector & 0x000000FF)>> 0) as u8;
-            decrypt::aes_decrypt(&buf, &self.disc_key, &iV)
+            decrypt::aes_decrypt(&buf, &self.disc_key.unwrap(), &iV)
         } else {
             if sector == 1 && self.tagline_3k3y.is_some() {
                 // Patch the 3k3y tagline if it exists

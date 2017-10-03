@@ -66,12 +66,12 @@ fn run() -> Result<()> {
                 println!("{}", disc.gameid);
             } else if matches.is_present("keys") {
                 print!("      d1: ");
-                for &byte in disc.d1.as_ref() {
+                for &byte in disc.d1.unwrap().as_ref() {
                     print!("{:02X}", byte);
                 }
                 println!();
                 print!("disc_key: ");
-                for &byte in disc.disc_key.as_ref() {
+                for &byte in disc.disc_key.unwrap().as_ref() {
                     print!("{:02X}", byte);
                 }
                 println!();

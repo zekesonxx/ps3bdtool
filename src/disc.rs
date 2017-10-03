@@ -98,7 +98,7 @@ impl<F: Read+Seek> PS3Disc<F> {
         Ok(PS3Disc {
             regions: regions,
             total_sectors: start_sector+1,
-            d1: disc_key_arr,
+            d1: d1,
             disc_key: disc_key_arr,
             gameid: game_id.to_string(),
             tagline_3k3y: tagline_3k3y,

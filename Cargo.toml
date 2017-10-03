@@ -4,6 +4,13 @@ name = "ps3bdstuff"
 version = "0.1.0"
 
 [dependencies]
+bytesize = "0.1.3"
+clap = "2.26.2"
 error-chain = "0.11.0"
 nom = "3.2.0"
 rust-crypto = "0.2.36"
+
+[profile]
+
+[profile.dev]
+opt-level = 2

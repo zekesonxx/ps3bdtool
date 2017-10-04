@@ -6,6 +6,7 @@
 #[macro_use] extern crate clap;
 extern crate crypto;
 extern crate bytesize;
+extern crate hex;
 
 pub mod sector;
 pub mod disc;
@@ -16,6 +17,7 @@ use std::path::PathBuf;
 use std::io::{BufReader, BufWriter, Write};
 use std::ffi::OsStr;
 use bytesize::ByteSize;
+use hex::FromHex;
 
 pub mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -51,6 +53,7 @@ fn run() -> Result<()> {
             (@setting ArgRequiredElseHelp)
             (@arg FILE: +required "File to decrypt")
             (@arg OUTFILE: "Output file, defaults to <input>.dec.iso")
+            (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes (not implemented)")
             (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to num_cpus+1 (not implemented)")
             (@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
@@ -117,6 +120,37 @@ fn run() -> Result<()> {
             println!("output: {}", output_path.display());
             let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
             let mut writer = BufWriter::new(fout);
+
+            if let Some(d1) = matches.value_of("d1") {
+                let d1: Vec<u8> = FromHex::from_hex(d1.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
+                disc.set_d1(d1.as_ref())?;
+            }
+
+            if let Some(key) = matches.value_of("key") {
+                let disc_key: Vec<u8> = FromHex::from_hex(key.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
+                disc.set_disc_key(disc_key.as_ref())?;
+            }
+
+            if disc.disc_key.is_none() {
+                println!("No 3k3y header found, and no d1 or disc key specified!");
+                println!("Disc can't be decrypted without any of those.");
+                println!("Consider passing a value to --key or --d1");
+                //TODO ird files
+                return Ok(());
+            }
+            if let Some(d1) = disc.d1 {
+                print!("using d1: ");
+                for &byte in d1.as_ref() {
+                    print!("{:02X}", byte);
+                }
+                println!();
+            }
+            print!("{} disc key: ", if disc.d1.is_some() {"calculated"} else {"using"});
+            for &byte in disc.disc_key.unwrap().as_ref() {
+                print!("{:02X}", byte);
+            }
+            println!();
+
 
             println!("sectors: {sectors} ({size}), regions: {regions}",
                      sectors=disc.total_sectors,

@@ -142,4 +142,29 @@ impl<F: Read+Seek> PS3Disc<F> {
             Ok(buf.to_owned())
         }
     }
+
+    pub fn set_d1(&mut self, d1: &[u8]) -> Result<()> {
+        if d1.len() != 16 {
+            bail!("expected d1 length 16, got length {}", d1.len());
+        }
+        let mut d1_arr = [0u8; 16];
+        d1_arr.copy_from_slice(d1);
+
+        let mut disc_key_arr = [0u8; 16];
+        let disc_key: Vec<u8> = decrypt::disc_key(&d1_arr).chain_err(|| "Failed to generate disc key")?;
+        disc_key_arr.copy_from_slice(disc_key.as_slice());
+        self.d1 = Some(d1_arr);
+        self.disc_key = Some(disc_key_arr);
+        Ok(())
+    }
+
+    pub fn set_disc_key(&mut self, disc_key: &[u8]) -> Result<()> {
+        if disc_key.len() != 16 {
+            bail!("expected disc_key length 16, got length {}", disc_key.len());
+        }
+        let mut disc_key_arr = [0u8; 16];
+        disc_key_arr.copy_from_slice(disc_key);
+        self.disc_key = Some(disc_key_arr);
+        Ok(())
+    }
 }

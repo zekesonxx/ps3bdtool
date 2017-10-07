@@ -2,6 +2,7 @@
 //use super::errors::*;
 use std::fmt;
 
+#[derive(Clone, Copy)]
 pub struct Region {
     /// Number of the region, starting from 0
     pub id: u32,

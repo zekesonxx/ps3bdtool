@@ -33,6 +33,14 @@ pub struct PS3Disc<F> {
     reader_handle: F
 }
 
+#[derive(Debug, Clone)]
+pub struct PS3DiscDecrypter {
+    pub regions: Vec<Region>,
+    pub disc_key: [u8; 16],
+    pub has_3k3y_tagline: bool
+}
+
+
 impl<F: Read+Seek> PS3Disc<F> {
     /// Create a new PS3Disc
     //TODO handle the disc key not existing
@@ -143,6 +151,23 @@ impl<F: Read+Seek> PS3Disc<F> {
         }
     }
 
+
+    pub fn read_sector_nodecrypt(&mut self, sector: u32) -> Result<Vec<u8>> {
+        let mut buf = [0u8; 2048];
+        &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
+            .chain_err(|| "failed to seek")?;
+        &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
+        Ok(buf.to_owned())
+    }
+
+    pub fn get_decryptor(&self) -> PS3DiscDecrypter {
+        PS3DiscDecrypter {
+            regions: self.regions.clone(),
+            disc_key: self.disc_key.unwrap(),
+            has_3k3y_tagline: self.tagline_3k3y.is_some()
+        }
+    }
+
     pub fn set_d1(&mut self, d1: &[u8]) -> Result<()> {
         if d1.len() != 16 {
             bail!("expected d1 length 16, got length {}", d1.len());
@@ -166,5 +191,33 @@ impl<F: Read+Seek> PS3Disc<F> {
         disc_key_arr.copy_from_slice(disc_key);
         self.disc_key = Some(disc_key_arr);
         Ok(())
+    }
+}
+
+impl PS3DiscDecrypter {
+    #[allow(non_snake_case)]
+    pub fn decrypt_sector(&self, buf: &mut [u8], sector: u32) -> Result<Vec<u8>> {
+        if self.regions.region_for_sector(sector).unwrap().encrypted {
+            // code courtesy of the PS3DevWiki.
+            let mut iV = [0u8; 16];
+            iV[12] = ((sector & 0xFF000000)>>24) as u8;
+            iV[13] = ((sector & 0x00FF0000)>>16) as u8;
+            iV[14] = ((sector & 0x0000FF00)>> 8) as u8;
+            iV[15] = ((sector & 0x000000FF)>> 0) as u8;
+            decrypt::aes_decrypt(&buf, &self.disc_key, &iV)
+        } else {
+            if sector == 1 && self.has_3k3y_tagline {
+                // Patch the 3k3y tagline if it exists
+                // at the end of the second sector (0 indexed so it's sector 1)
+                // mainly just so we get byte-for-byte identical decrypts
+                // Encrypted taglines: Encrypted 3K ___
+                // Decrypted taglines: Decrypted 3K ___
+                // so we just change the "En" to "De"
+                buf[1904] = b'D';
+                buf[1905] = b'e';
+            }
+
+            Ok(buf.to_owned())
+        }
     }
 }

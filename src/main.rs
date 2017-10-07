@@ -14,8 +14,11 @@ pub mod decrypt;
 
 use std::fs::File;
 use std::path::PathBuf;
-use std::io::{BufReader, BufWriter, Write};
+use std::io::{BufReader, BufWriter, Write, Seek, SeekFrom};
 use std::ffi::OsStr;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::sync::mpsc;
 use bytesize::ByteSize;
 use hex::FromHex;
 
@@ -54,8 +57,8 @@ fn run() -> Result<()> {
             (@arg FILE: +required "File to decrypt")
             (@arg OUTFILE: "Output file, defaults to <input>.dec.iso")
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
-            (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes (not implemented)")
-            (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to num_cpus+1 (not implemented)")
+            (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
+            (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
             (@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
         )
     ).get_matches();
@@ -157,15 +160,68 @@ fn run() -> Result<()> {
                      size=ByteSize::b(disc.total_sectors as usize * 2048).to_string(true),
                      regions=disc.regions.len());
 
-            for i in 0..disc.total_sectors {
-                writer.write_all(disc.read_sector(i).chain_err(|| "failed to read something")?.as_ref()).chain_err(|| "failed to write something")?;
-                print!("\rsector: {}/{} ({}%)",
-                       i,
-                       disc.total_sectors,
-                       ((i as f64)/(disc.total_sectors as f64)*100f64).floor()
-                );
+
+            let threads = matches.value_of("threads").unwrap_or("1").parse::<usize>().unwrap(); //TODO get num_cpus
+            if threads == 1 {
+                for i in 0..disc.total_sectors {
+                    writer.write_all(disc.read_sector(i).chain_err(|| "failed to read something")?.as_ref()).chain_err(|| "failed to write something")?;
+                    print!("\rsector: {}/{} ({}%)",
+                           i,
+                           disc.total_sectors,
+                           ((i as f64)/(disc.total_sectors as f64)*100f64).floor()
+                    );
+                }
+                println!();
+            } else if threads > 1 {
+                let total_sectors = disc.total_sectors;
+                let decryptor = disc.get_decryptor();
+                let writer = Arc::new(Mutex::new(writer));
+                let disc = Arc::new(Mutex::new((0u32, disc)));
+                let (tx, rx) = mpsc::channel();
+
+                for _ in 0..threads {
+                    let (writer, disc, tx) = (writer.clone(), disc.clone(), tx.clone());
+                    let decryptor = decryptor.clone();
+                    thread::spawn(move || {
+                        let mut encrypted: Vec<u8>; //TODO switch these to [u8; 2048]
+                        let mut decrypted: Vec<u8>;
+                        let mut cur_sec: u32;
+                        loop {
+                            {
+                                let (ref mut current_sector, ref mut disc) = *disc.lock().unwrap();
+                                cur_sec = *current_sector;
+                                if *current_sector >= disc.total_sectors {
+                                    tx.send(true).unwrap();
+                                    break;
+                                } else {
+                                    tx.send(false).unwrap();
+                                }
+                                encrypted = disc.read_sector_nodecrypt(*current_sector).unwrap();
+                                *current_sector += 1;
+                            }
+                            decrypted = decryptor.decrypt_sector(&mut encrypted, cur_sec).unwrap();
+                            {
+                                let mut writer = writer.lock().unwrap();
+                                writer.seek(SeekFrom::Start(cur_sec as u64 * 2048)).unwrap();
+                                writer.write_all(decrypted.as_ref()).unwrap();
+                            }
+                        }
+                    });
+                }
+
+                let mut progress = 0;
+                while rx.recv().unwrap() != true {
+                    progress += 1;
+                    print!("\rsector: {}/{} ({}%)",
+                           progress,
+                           total_sectors,
+                           ((progress as f64) / (total_sectors as f64) * 100f64).floor()
+                    );
+                }
+                println!();
+            } else {
+                println!("must specify a -j/--threads value of 1 or more");
             }
-            println!();
         },
         (_, _) => unreachable!()
     }

@@ -108,13 +108,18 @@ fn run() -> Result<()> {
 
             let mut disc = disc::PS3Disc::new(reader)?;
 
+            // Calculate output filename
             let output_path = if let Some(outfile) = matches.value_of("OUTFILE") {
+                // User specified a file, so we do what they tell us
                 PathBuf::from(outfile)
             } else {
+                // No output specified
                 let mut pathbuf = PathBuf::from(matches.value_of("FILE").unwrap());
                 if pathbuf.extension() == Some(OsStr::new("iso")) {
+                    // It's an .iso, so let's do orig.dec.iso
                     pathbuf.set_extension("dec.iso");
                 } else {
+                    // It's not an .iso, so let's do BCUS12345.dec.iso
                     pathbuf = PathBuf::from(format!("{}.dec.iso", disc.gameid.replace('-', "")));
                 }
                 pathbuf
@@ -124,16 +129,22 @@ fn run() -> Result<()> {
             let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
             let mut writer = BufWriter::new(fout);
 
+
+            if matches.is_present("d1") && matches.is_present("key") {
+                println!("warning: --key takes precedence over --d1");
+            }
+            // Check if the user passed us --d1 and/or --key, and set them accordingly
             if let Some(d1) = matches.value_of("d1") {
                 let d1: Vec<u8> = FromHex::from_hex(d1.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
                 disc.set_d1(d1.as_ref())?;
             }
-
             if let Some(key) = matches.value_of("key") {
                 let disc_key: Vec<u8> = FromHex::from_hex(key.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
                 disc.set_disc_key(disc_key.as_ref())?;
             }
 
+            // Gracefully and helpfully fail if we don't have a disc_key
+            // rather than panicing later when PS3Disc calls unwrap on the disc_key
             if disc.disc_key.is_none() {
                 println!("No 3k3y header found, and no d1 or disc key specified!");
                 println!("Disc can't be decrypted without any of those.");
@@ -160,9 +171,11 @@ fn run() -> Result<()> {
                      size=ByteSize::b(disc.total_sectors as usize * 2048).to_string(true),
                      regions=disc.regions.len());
 
+            // Start the actual decryption/ripping process
 
             let threads = matches.value_of("threads").unwrap_or("1").parse::<usize>().unwrap(); //TODO get num_cpus
             if threads == 1 {
+                // Singlethreaded Decrypt
                 for i in 0..disc.total_sectors {
                     writer.write_all(disc.read_sector(i).chain_err(|| "failed to read something")?.as_ref()).chain_err(|| "failed to write something")?;
                     print!("\rsector: {}/{} ({}%)",
@@ -173,6 +186,7 @@ fn run() -> Result<()> {
                 }
                 println!();
             } else if threads > 1 {
+                // Multithreaded Decrypt
                 let total_sectors = disc.total_sectors;
                 let decryptor = disc.get_decryptor();
                 let writer = Arc::new(Mutex::new(writer));

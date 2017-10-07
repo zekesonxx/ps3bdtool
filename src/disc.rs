@@ -7,6 +7,7 @@ use decrypt;
 /// given a four-element &[u8], calculate the big-endian u32 that they represent
 /// shamelessly taken out of nom
 fn be_u32(i: &[u8]) -> u32 {
+    debug_assert_eq!(i.len(), 4, "a u32 is 4 bytes and yet I didn't get 4 bytes");
     ((i[0] as u32) << 24) + ((i[1] as u32) << 16) + ((i[2] as u32) << 8) + i[3] as u32
 }
 
@@ -33,17 +34,25 @@ pub struct PS3Disc<F> {
     reader_handle: F
 }
 
+/// Standalone struct to decrypt PS3 disc regions
+///
+/// This only requires an immutable reference to decrypt a region,
+/// and while so does PS3Disc, it's also being used mutably to read sectors.
+///
+/// This make it a lot easier do multithreaded decrypts.
 #[derive(Debug, Clone)]
-pub struct PS3DiscDecrypter {
+pub struct PS3DiscDecryptor {
+    /// Disc's regions
     pub regions: Vec<Region>,
+    /// Disc key
     pub disc_key: [u8; 16],
+    /// Whether the 3k3y tagline needs to be patched or not.
     pub has_3k3y_tagline: bool
 }
 
 
 impl<F: Read+Seek> PS3Disc<F> {
     /// Create a new PS3Disc
-    //TODO handle the disc key not existing
     pub fn new(mut handle: F) -> Result<Self> {
         // Read the first two sectors (disc sectors are 2KiB)
         // Sector 0 contains the region information (as in, encrypted sectors, not region coding)
@@ -51,6 +60,11 @@ impl<F: Read+Seek> PS3Disc<F> {
         // Sector 1 also ends with the 3k3y-injected data, if it's present.
         let mut header = [0; 4096];
         handle.read_exact(&mut header).chain_err(|| "Failed to read disc header")?;
+
+        // Check for the magic number, and bail if it's not present.
+        if &header[2048..(2048+12)] != b"PlayStation3" {
+            bail!("Magic number PlayStation3 not found. Are you sure this is a game disc?");
+        }
 
         // Number of normal sector regions according to the disc.
         let num_normal_regions= be_u32(&header[0..4]);
@@ -107,12 +121,9 @@ impl<F: Read+Seek> PS3Disc<F> {
         }
 
         Ok(PS3Disc {
-            regions: regions,
+            regions, d1, disc_key, tagline_3k3y,
             total_sectors: start_sector+1,
-            d1: d1,
-            disc_key: disc_key,
             gameid: game_id.to_string(),
-            tagline_3k3y: tagline_3k3y,
             reader_handle: handle
         })
     }
@@ -160,8 +171,8 @@ impl<F: Read+Seek> PS3Disc<F> {
         Ok(buf.to_owned())
     }
 
-    pub fn get_decryptor(&self) -> PS3DiscDecrypter {
-        PS3DiscDecrypter {
+    pub fn get_decryptor(&self) -> PS3DiscDecryptor {
+        PS3DiscDecryptor {
             regions: self.regions.clone(),
             disc_key: self.disc_key.unwrap(),
             has_3k3y_tagline: self.tagline_3k3y.is_some()
@@ -194,10 +205,13 @@ impl<F: Read+Seek> PS3Disc<F> {
     }
 }
 
-impl PS3DiscDecrypter {
+impl PS3DiscDecryptor {
     #[allow(non_snake_case)]
     pub fn decrypt_sector(&self, buf: &mut [u8], sector: u32) -> Result<Vec<u8>> {
-        if self.regions.region_for_sector(sector).unwrap().encrypted {
+        if buf.len() != 2048 {
+            bail!("PS3 disc sectors are always exactly 2048 bytes. No partial decrypts.");
+        }
+        if self.regions.region_for_sector(sector).unwrap().encrypted { //TODO fix this
             // code courtesy of the PS3DevWiki.
             let mut iV = [0u8; 16];
             iV[12] = ((sector & 0xFF000000)>>24) as u8;

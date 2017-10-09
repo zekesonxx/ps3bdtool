@@ -2,6 +2,11 @@
 //use super::errors::*;
 use std::fmt;
 
+/// A simple struct representing a PS3 game disc region
+///
+/// These are sector numbers, inclusive, representing encrypted or decrypted sectors.
+///
+/// Used internally by PS3Disc.
 #[derive(Clone, Copy)]
 pub struct Region {
     /// Number of the region, starting from 0
@@ -15,6 +20,7 @@ pub struct Region {
 }
 
 impl Region {
+    /// Whether a given sector number falls within this region or not
     pub fn within_region(&self, sector: u32) -> bool {
         (self.start <= sector) && (sector <= self.end)
     }
@@ -35,6 +41,7 @@ pub trait VecRegion {
 }
 
 impl VecRegion for Vec<Region> {
+    /// Given a sector number, find the region that it falls within or None if it doesn't fall within any.
     fn region_for_sector(&self, sector: u32) -> Option<&Region> {
         for range in self {
             if range.within_region(sector) {

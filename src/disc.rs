@@ -163,6 +163,9 @@ impl<F: Read+Seek> PS3Disc<F> {
     }
 
 
+    /// Read a sector, but don't automatically decrypt
+    ///
+    /// Generally speaking, you only want to use this to then feed into a PS3DiscDecryptor
     pub fn read_sector_nodecrypt(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
         &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
@@ -171,6 +174,9 @@ impl<F: Read+Seek> PS3Disc<F> {
         Ok(buf.to_owned())
     }
 
+    /// Returns a standalone struct that can be used to decrypt individual sectors.
+    ///
+    /// See struct documentation for more information.
     pub fn get_decryptor(&self) -> PS3DiscDecryptor {
         PS3DiscDecryptor {
             regions: self.regions.clone(),
@@ -179,6 +185,9 @@ impl<F: Read+Seek> PS3Disc<F> {
         }
     }
 
+    /// Safely set the d1 decryption key, used to compute the disc key.
+    ///
+    /// This function will compute the disc key on execution.
     pub fn set_d1(&mut self, d1: &[u8]) -> Result<()> {
         if d1.len() != 16 {
             bail!("expected d1 length 16, got length {}", d1.len());
@@ -194,6 +203,9 @@ impl<F: Read+Seek> PS3Disc<F> {
         Ok(())
     }
 
+    /// Safely set the disc decryption key (this is *not* the d1 key used to compute the disc key)
+    ///
+    /// This is not the key the BR drive will give you, nor is it the data1 key in IRD files.
     pub fn set_disc_key(&mut self, disc_key: &[u8]) -> Result<()> {
         if disc_key.len() != 16 {
             bail!("expected disc_key length 16, got length {}", disc_key.len());
@@ -206,6 +218,11 @@ impl<F: Read+Seek> PS3Disc<F> {
 }
 
 impl PS3DiscDecryptor {
+    /// Standalone sector decryption function
+    ///
+    /// `ps3discdecryptor.decrypt_sector(ps3disc.read_sector_nodecrypt(4), 4)`
+    /// is functionally identical to
+    /// `ps3disc.read_sector(4)`
     #[allow(non_snake_case)]
     pub fn decrypt_sector(&self, buf: &mut [u8], sector: u32) -> Result<Vec<u8>> {
         if buf.len() != 2048 {

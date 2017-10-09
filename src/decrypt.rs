@@ -3,6 +3,7 @@ use super::errors::*;
 use crypto::{buffer, aes, blockmodes};
 use crypto::buffer::{ReadBuffer, WriteBuffer, BufferResult};
 
+/// High-level, simple function to do an AES128 CBC encrypt using rust-crypto
 pub fn aes_encrypt(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut encryptor = aes::cbc_encryptor(
         aes::KeySize::KeySize128,
@@ -32,6 +33,7 @@ pub fn aes_encrypt(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     Ok(final_result)
 }
 
+/// High-level, simple function to do an AES128 CBC decrypt using rust-crypto
 pub fn aes_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
     let mut decryptor = aes::cbc_decryptor(
         aes::KeySize::KeySize128,

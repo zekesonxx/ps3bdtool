@@ -224,7 +224,7 @@ impl PS3DiscDecryptor {
     /// is functionally identical to
     /// `ps3disc.read_sector(4)`
     #[allow(non_snake_case)]
-    pub fn decrypt_sector(&self, buf: &mut [u8], sector: u32) -> Result<Vec<u8>> {
+    pub fn decrypt_sector(&self, buf: &[u8], sector: u32) -> Result<Vec<u8>> {
         if buf.len() != 2048 {
             bail!("PS3 disc sectors are always exactly 2048 bytes. No partial decrypts.");
         }
@@ -237,6 +237,7 @@ impl PS3DiscDecryptor {
             iV[15] = ((sector & 0x000000FF)>> 0) as u8;
             decrypt::aes_decrypt(&buf, &self.disc_key, &iV)
         } else {
+            let mut buf = buf.to_owned();
             if sector == 1 && self.has_3k3y_tagline {
                 // Patch the 3k3y tagline if it exists
                 // at the end of the second sector (0 indexed so it's sector 1)
@@ -248,7 +249,7 @@ impl PS3DiscDecryptor {
                 buf[1905] = b'e';
             }
 
-            Ok(buf.to_owned())
+            Ok(buf)
         }
     }
 }

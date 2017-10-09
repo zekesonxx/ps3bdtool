@@ -213,7 +213,7 @@ fn run() -> Result<()> {
                                 encrypted = disc.read_sector_nodecrypt(*current_sector).unwrap();
                                 *current_sector += 1;
                             }
-                            decrypted = decryptor.decrypt_sector(&mut encrypted, cur_sec).unwrap();
+                            decrypted = decryptor.decrypt_sector(&encrypted, cur_sec).unwrap();
                             {
                                 let mut writer = writer.lock().unwrap();
                                 writer.seek(SeekFrom::Start(cur_sec as u64 * 2048)).unwrap();

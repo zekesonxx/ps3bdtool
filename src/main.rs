@@ -7,10 +7,14 @@
 extern crate crypto;
 extern crate bytesize;
 extern crate hex;
+extern crate fuse;
+extern crate libc;
+extern crate time;
 
 pub mod sector;
 pub mod disc;
 pub mod decrypt;
+pub mod mountvfs;
 
 use std::fs::File;
 use std::path::PathBuf;
@@ -60,6 +64,16 @@ fn run() -> Result<()> {
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
             (@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
+        )
+        (@subcommand mount =>
+            (about: "Use FUSE to mount a filesystem containing a transparently-decrypted iso")
+            (@setting ArgRequiredElseHelp)
+            (@arg FILE: +required "Path to game image or disc drive")
+            (@arg MOUNTPOINT: +required "Path to mount to")
+            (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
+            (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
+            //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
+            //(@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
         )
     ).get_matches();
     match matches.subcommand() {
@@ -236,6 +250,28 @@ fn run() -> Result<()> {
             } else {
                 println!("must specify a -j/--threads value of 1 or more");
             }
+        },
+        ("mount", Some(matches)) => {
+            println!("disc: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());
+            let f = File::open(matches.value_of("FILE").unwrap()).chain_err(|| "Failed to open file")?;
+            let reader = BufReader::new(f);
+
+            let mut disc = disc::PS3Disc::new(reader)?;
+
+            if matches.is_present("d1") && matches.is_present("key") {
+                println!("warning: --key takes precedence over --d1");
+            }
+            // Check if the user passed us --d1 and/or --key, and set them accordingly
+            if let Some(d1) = matches.value_of("d1") {
+                let d1: Vec<u8> = FromHex::from_hex(d1.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
+                disc.set_d1(d1.as_ref())?;
+            }
+            if let Some(key) = matches.value_of("key") {
+                let disc_key: Vec<u8> = FromHex::from_hex(key.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
+                disc.set_disc_key(disc_key.as_ref())?;
+            }
+
+            mountvfs::mount(disc, matches.value_of("MOUNTPOINT").unwrap());
         },
         (_, _) => unreachable!()
     }

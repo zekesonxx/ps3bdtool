@@ -14,7 +14,8 @@ pub struct IRDFile<'a> {
     pub pic_data: &'a [u8], //TODO: switch to [u8; 0x73] when practical, Rust 1.21?
     pub data1: [u8; 16],
     pub data2: [u8; 16],
-    pub unique_identifier: u32
+    pub unique_identifier: u32,
+    pub crc32: [u8; 4]
 }
 
 named!(pub parse_ird<IRDFile>, do_parse!(
@@ -39,9 +40,10 @@ named!(pub parse_ird<IRDFile>, do_parse!(
     data2: count_fixed!(u8, be_u8, 16) >>
     //TODO: pic data here for ver<9
     unique_identifier: le_u32 >> //TODO: version gate this behind ver>7
+    crc32: count_fixed!(u8, be_u8, 4) >> //TODO verify crc32
     (IRDFile {
         version, region_hashes, pic_data, data1, data2, unique_identifier,
         game_id, game_name, update_ver, game_ver, app_ver,
-        header_comp, footer_comp,
+        header_comp, footer_comp, crc32
     })
 ));

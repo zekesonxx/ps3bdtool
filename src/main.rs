@@ -2,7 +2,7 @@
 #![recursion_limit = "1024"]
 
 #[macro_use] extern crate error_chain;
-//#[macro_use] extern crate nom;
+#[macro_use] extern crate nom;
 #[macro_use] extern crate clap;
 extern crate crypto;
 extern crate bytesize;
@@ -15,10 +15,11 @@ pub mod sector;
 pub mod disc;
 pub mod decrypt;
 pub mod mountvfs;
+pub mod ird;
 
 use std::fs::File;
 use std::path::PathBuf;
-use std::io::{BufReader, BufWriter, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufWriter, Write, Read, Seek, SeekFrom};
 use std::ffi::OsStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -74,6 +75,11 @@ fn run() -> Result<()> {
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
             //(@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
+        )
+        (@subcommand irdinfo =>
+            (about: "Print information about a 3k3y IRD file")
+            (@setting ArgRequiredElseHelp)
+            (@arg FILE: +required "Path to 3k3y IRD file")
         )
     ).get_matches();
     match matches.subcommand() {
@@ -273,6 +279,32 @@ fn run() -> Result<()> {
 
             mountvfs::mount(disc, matches.value_of("MOUNTPOINT").unwrap());
         },
+        ("irdinfo", Some(matches)) => {
+            println!("file: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());
+            let f = File::open(matches.value_of("FILE").unwrap()).chain_err(|| "Failed to open file")?;
+            let mut reader = BufReader::new(f);
+            let mut buf = vec![];
+            reader.read_to_end(&mut buf).chain_err(|| "Failed to read file")?;
+            let parsed: ird::IRDFile = ird::parse_ird(buf.as_ref()).unwrap().1;
+            println!("{:?}", parsed);
+            for hash in parsed.region_hashes {
+                print!("hash: ");
+                for &byte in hash.as_ref() {
+                    print!("{:02X}", byte);
+                }
+                println!();
+            }
+            print!("data1: ");
+            for &byte in parsed.data1.as_ref() {
+                print!("{:02X}", byte);
+            }
+            println!();
+            print!("data2: ");
+            for &byte in parsed.data2.as_ref() {
+                print!("{:02X}", byte);
+            }
+            println!();
+        }
         (_, _) => unreachable!()
     }
     Ok(())

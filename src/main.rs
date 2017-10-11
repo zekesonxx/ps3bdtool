@@ -20,14 +20,13 @@ pub mod ird;
 
 use std::fs::File;
 use std::path::PathBuf;
-use std::io::{BufReader, BufWriter, Write, Read, Seek, SeekFrom};
+use std::io::{BufReader, BufWriter, Write, Seek, SeekFrom};
 use std::ffi::OsStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::sync::mpsc;
 use bytesize::ByteSize;
 use hex::FromHex;
-use flate2::bufread::GzDecoder;
 
 pub mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -66,7 +65,7 @@ fn run() -> Result<()> {
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
-            (@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
+            (@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
         )
         (@subcommand mount =>
             (about: "Use FUSE to mount a filesystem containing a transparently-decrypted iso")
@@ -76,13 +75,12 @@ fn run() -> Result<()> {
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
-            //(@arg irdfile: --irdfile +takes_value "IRD file to extract key from (not implemented)")
+            //(@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
         )
         (@subcommand irdinfo =>
             (about: "Print information about a 3k3y IRD file")
             (@setting ArgRequiredElseHelp)
             (@arg FILE: +required "Path to 3k3y IRD file")
-            (@arg raw: --raw "File being passed has already been decompressed (why would you do this?)")
         )
     ).get_matches();
     match matches.subcommand() {
@@ -284,18 +282,7 @@ fn run() -> Result<()> {
         },
         ("irdinfo", Some(matches)) => {
             println!("file: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());
-            let f = File::open(matches.value_of("FILE").unwrap()).chain_err(|| "Failed to open file")?;
-            let mut reader = BufReader::new(f);
-            let mut buf = vec![];
-            if matches.is_present("raw") {
-                // Straight read
-                reader.read_to_end(&mut buf).chain_err(|| "Failed to read file")?;
-            } else {
-                // Gzip decompress
-                let mut reader = GzDecoder::new(reader).chain_err(|| "Failed to decompress")?;
-                reader.read_to_end(&mut buf).chain_err(|| "Failed to read file")?;
-            }
-            let parsed: ird::IRDFile = ird::parse_ird(buf.as_ref()).unwrap().1;
+            let parsed = ird::read_ird(matches.value_of("FILE").unwrap())?;
             println!("{:?}", parsed);
             for hash in parsed.region_hashes {
                 print!("hash: ");

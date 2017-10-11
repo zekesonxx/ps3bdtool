@@ -10,6 +10,7 @@ extern crate hex;
 extern crate fuse;
 extern crate libc;
 extern crate time;
+extern crate flate2;
 
 pub mod sector;
 pub mod disc;
@@ -26,6 +27,7 @@ use std::thread;
 use std::sync::mpsc;
 use bytesize::ByteSize;
 use hex::FromHex;
+use flate2::bufread::GzDecoder;
 
 pub mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
@@ -80,6 +82,7 @@ fn run() -> Result<()> {
             (about: "Print information about a 3k3y IRD file")
             (@setting ArgRequiredElseHelp)
             (@arg FILE: +required "Path to 3k3y IRD file")
+            (@arg raw: --raw "File being passed has already been decompressed (why would you do this?)")
         )
     ).get_matches();
     match matches.subcommand() {
@@ -284,7 +287,14 @@ fn run() -> Result<()> {
             let f = File::open(matches.value_of("FILE").unwrap()).chain_err(|| "Failed to open file")?;
             let mut reader = BufReader::new(f);
             let mut buf = vec![];
-            reader.read_to_end(&mut buf).chain_err(|| "Failed to read file")?;
+            if matches.is_present("raw") {
+                // Straight read
+                reader.read_to_end(&mut buf).chain_err(|| "Failed to read file")?;
+            } else {
+                // Gzip decompress
+                let mut reader = GzDecoder::new(reader).chain_err(|| "Failed to decompress")?;
+                reader.read_to_end(&mut buf).chain_err(|| "Failed to read file")?;
+            }
             let parsed: ird::IRDFile = ird::parse_ird(buf.as_ref()).unwrap().1;
             println!("{:?}", parsed);
             for hash in parsed.region_hashes {

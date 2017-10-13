@@ -75,7 +75,6 @@ impl<F: Read+Seek> PS3Disc<F> {
 
         // Get the 3k3y tagline, if it exists.
         // This immediately proceeds the ird-injected d1 key, which is used to generate the disc key
-        //TODO when IRD files are implemented, fix this part.
         let f70 = &header[0xF70..(0xF70+16)];
         let tagline_3k3y = if f70 == &[0u8; 16] {
             None
@@ -87,7 +86,7 @@ impl<F: Read+Seek> PS3Disc<F> {
         let game_id = String::from_utf8_lossy(&header[2064..(2064+20)]);
         let game_id = game_id.trim_right();
 
-        // Get the encrypted (decrypted...?) disc key
+        // Get the encrypted (decrypted...?) disc key, if it's available.
         let mut d1 = [0u8; 16];
         d1.copy_from_slice(&header[3968..(3968+16)]);
         let (d1, disc_key) = if d1 == [0; 16] {
@@ -171,7 +170,7 @@ impl<F: Read+Seek> PS3Disc<F> {
     /// Read a sector, but don't automatically decrypt
     ///
     /// Generally speaking, you only want to use this to then feed into a PS3DiscDecryptor
-    pub fn read_sector_nodecrypt(&mut self, sector: u32) -> Result<Vec<u8>> {
+    pub fn read_sector_raw(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
         &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
             .chain_err(|| "failed to seek")?;
@@ -180,8 +179,6 @@ impl<F: Read+Seek> PS3Disc<F> {
     }
 
     /// Returns a standalone struct that can be used to decrypt individual sectors.
-    ///
-    /// Will panic if
     ///
     /// See struct documentation for more information.
     pub fn get_decryptor(&self) -> Result<PS3DiscDecryptor> {
@@ -232,6 +229,9 @@ impl<F: Read+Seek> PS3Disc<F> {
         self.disc_key.is_some()
     }
 
+    /// Safely import a d1 key from an IRD file
+    ///
+    /// This function will compute the disc key on execution.
     pub fn import_from_ird(&mut self, ird_file: IRDFile) -> Result<()> {
         if ird_file.data1 == [0; 16] {
             bail!("IRD file appears to be corrupted, its d1 key is zeroed!");
@@ -243,7 +243,7 @@ impl<F: Read+Seek> PS3Disc<F> {
 impl PS3DiscDecryptor {
     /// Standalone sector decryption function
     ///
-    /// `ps3discdecryptor.decrypt_sector(ps3disc.read_sector_nodecrypt(4), 4)`
+    /// `ps3discdecryptor.decrypt_sector(ps3disc.read_sector_raw(4), 4)`
     /// is functionally identical to
     /// `ps3disc.read_sector(4)`
     #[allow(non_snake_case)]

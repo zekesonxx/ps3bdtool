@@ -1,9 +1,9 @@
-use fuse::{self, Filesystem, FileAttr, FileType, Request, ReplyAttr, ReplyDirectory, ReplyEntry, ReplyData, ReplyOpen};
+use fuse::{self, Filesystem, FileAttr, FileType, Request, ReplyAttr, ReplyDirectory, ReplyEntry, ReplyData};
 use disc::PS3Disc;
 use std::io::{Read, Seek};
 use std::path::Path;
 use std::ffi::OsStr;
-use libc::{ENOENT, ENOSYS};
+use libc::{ENOENT};
 use time::Timespec;
 
 struct DecryptFilesystem<F> {

@@ -198,7 +198,7 @@ fn run() -> Result<()> {
 
             // Start the actual decryption/ripping process
 
-            let threads = matches.value_of("threads").unwrap_or("1").parse::<usize>().unwrap(); //TODO get num_cpus
+            let threads = matches.value_of("threads").unwrap_or("1").parse::<usize>().unwrap();
             if threads == 1 {
                 // Singlethreaded Decrypt
                 for i in 0..disc.total_sectors {
@@ -222,7 +222,7 @@ fn run() -> Result<()> {
                     let (writer, disc, tx) = (writer.clone(), disc.clone(), tx.clone());
                     let decryptor = decryptor.clone();
                     thread::spawn(move || {
-                        let mut encrypted: Vec<u8>; //TODO switch these to [u8; 2048]
+                        let mut encrypted: Vec<u8>; //TODO switch one or both of these to [u8; 2048]?
                         let mut decrypted: Vec<u8>;
                         let mut cur_sec: u32;
                         loop {
@@ -235,7 +235,7 @@ fn run() -> Result<()> {
                                 } else {
                                     tx.send(false).unwrap();
                                 }
-                                encrypted = disc.read_sector_nodecrypt(*current_sector).unwrap();
+                                encrypted = disc.read_sector_raw(*current_sector).unwrap();
                                 *current_sector += 1;
                             }
                             decrypted = decryptor.decrypt_sector(&encrypted, cur_sec).unwrap();

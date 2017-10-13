@@ -3,6 +3,7 @@ use super::errors::*;
 use sector::{Region, VecRegion};
 use std::io::{Read, Seek, SeekFrom};
 use decrypt;
+use ird::IRDFile;
 
 /// given a four-element &[u8], calculate the big-endian u32 that they represent
 /// shamelessly taken out of nom
@@ -139,13 +140,17 @@ impl<F: Read+Seek> PS3Disc<F> {
         &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
 
         if self.regions.region_for_sector(sector).unwrap().encrypted {
-            // code courtesy of the PS3DevWiki.
-            let mut iV = [0u8; 16];
-            iV[12] = ((sector & 0xFF000000)>>24) as u8;
-            iV[13] = ((sector & 0x00FF0000)>>16) as u8;
-            iV[14] = ((sector & 0x0000FF00)>> 8) as u8;
-            iV[15] = ((sector & 0x000000FF)>> 0) as u8;
-            decrypt::aes_decrypt(&buf, &self.disc_key.unwrap(), &iV)
+            if let Some(disc_key) = self.disc_key {
+                // code courtesy of the PS3DevWiki.
+                let mut iV = [0u8; 16];
+                iV[12] = ((sector & 0xFF000000) >> 24) as u8;
+                iV[13] = ((sector & 0x00FF0000) >> 16) as u8;
+                iV[14] = ((sector & 0x0000FF00) >> 8) as u8;
+                iV[15] = ((sector & 0x000000FF) >> 0) as u8;
+                decrypt::aes_decrypt(&buf, &disc_key, &iV)
+            } else {
+                bail!("Encountered an encrypted sector but can't decrypt!");
+            }
         } else {
             if sector == 1 && self.tagline_3k3y.is_some() {
                 // Patch the 3k3y tagline if it exists
@@ -176,12 +181,18 @@ impl<F: Read+Seek> PS3Disc<F> {
 
     /// Returns a standalone struct that can be used to decrypt individual sectors.
     ///
+    /// Will panic if
+    ///
     /// See struct documentation for more information.
-    pub fn get_decryptor(&self) -> PS3DiscDecryptor {
-        PS3DiscDecryptor {
-            regions: self.regions.clone(),
-            disc_key: self.disc_key.unwrap(),
-            has_3k3y_tagline: self.tagline_3k3y.is_some()
+    pub fn get_decryptor(&self) -> Result<PS3DiscDecryptor> {
+        if let Some(disc_key) = self.disc_key {
+            Ok(PS3DiscDecryptor {
+                regions: self.regions.clone(),
+                disc_key,
+                has_3k3y_tagline: self.tagline_3k3y.is_some()
+            })
+        } else {
+            bail!("Tried to build a PS3DiscDecryptor but don't have a disc key!");
         }
     }
 
@@ -214,6 +225,18 @@ impl<F: Read+Seek> PS3Disc<F> {
         disc_key_arr.copy_from_slice(disc_key);
         self.disc_key = Some(disc_key_arr);
         Ok(())
+    }
+
+    /// Returns whether or not this PS3Disc is prepared to decrypt sectors
+    pub fn can_decrypt(&self) -> bool {
+        self.disc_key.is_some()
+    }
+
+    pub fn import_from_ird(&mut self, ird_file: IRDFile) -> Result<()> {
+        if ird_file.data1 == [0; 16] {
+            bail!("IRD file appears to be corrupted, its d1 key is zeroed!");
+        }
+        self.set_d1(ird_file.data1.as_ref()).chain_err(|| "Failed to import d1 key from IRD file")
     }
 }
 

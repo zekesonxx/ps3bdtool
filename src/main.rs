@@ -7,15 +7,17 @@
 extern crate crypto;
 extern crate bytesize;
 extern crate hex;
-extern crate fuse;
-extern crate libc;
 extern crate time;
 extern crate flate2;
+
+// FUSE mounting support
+#[cfg(unix)] extern crate fuse;
+#[cfg(unix)] extern crate libc;
 
 pub mod sector;
 pub mod disc;
 pub mod decrypt;
-pub mod mountvfs;
+#[cfg(unix)] pub mod mountvfs;
 pub mod ird;
 
 use std::fs::File;
@@ -45,10 +47,9 @@ use errors::*;
 quick_main!(run);
 
 fn run() -> Result<()> {
-    let matches: clap::ArgMatches = clap_app!(ps3bdtool =>
+    let mut app: clap::App = clap_app!(ps3bdtool =>
         (@setting ArgRequiredElseHelp)
         (version: crate_version!())
-        (author: crate_authors!())
         (about: "Tool to manipulate PS3 game discs")
         (@subcommand info =>
             (about: "Print information about a disc")
@@ -67,7 +68,14 @@ fn run() -> Result<()> {
             (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
             (@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
         )
-        (@subcommand mount =>
+        (@subcommand irdinfo =>
+            (about: "Print information about a 3k3y IRD file")
+            (@setting ArgRequiredElseHelp)
+            (@arg FILE: +required "Path to 3k3y IRD file")
+        )
+    );
+    if cfg!(unix) {
+        app = app.subcommand(clap_app!(@subcommand mount =>
             (about: "Use FUSE to mount a filesystem containing a transparently-decrypted iso")
             (@setting ArgRequiredElseHelp)
             (@arg FILE: +required "Path to game image or disc drive")
@@ -76,13 +84,9 @@ fn run() -> Result<()> {
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
             //(@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
-        )
-        (@subcommand irdinfo =>
-            (about: "Print information about a 3k3y IRD file")
-            (@setting ArgRequiredElseHelp)
-            (@arg FILE: +required "Path to 3k3y IRD file")
-        )
-    ).get_matches();
+        ));
+    }
+    let matches = app.get_matches();
     match matches.subcommand() {
         ("info", Some(matches)) => {
             let f = File::open(matches.value_of("FILE").unwrap()).chain_err(|| "Failed to open file")?;
@@ -165,8 +169,8 @@ fn run() -> Result<()> {
             }
 
             // Gracefully and helpfully fail if we don't have a disc_key
-            // rather than panicing later when PS3Disc calls unwrap on the disc_key
-            if disc.disc_key.is_none() {
+            // rather than throwing an error later because there's no disc_key.
+            if !disc.can_decrypt() {
                 println!("No 3k3y header found, and no d1 or disc key specified!");
                 println!("Disc can't be decrypted without any of those.");
                 println!("Consider passing a value to --key or --d1");
@@ -209,7 +213,7 @@ fn run() -> Result<()> {
             } else if threads > 1 {
                 // Multithreaded Decrypt
                 let total_sectors = disc.total_sectors;
-                let decryptor = disc.get_decryptor();
+                let decryptor = disc.get_decryptor().chain_err(|| "Failed to get standalone disc decryptor")?;
                 let writer = Arc::new(Mutex::new(writer));
                 let disc = Arc::new(Mutex::new((0u32, disc)));
                 let (tx, rx) = mpsc::channel();
@@ -258,6 +262,7 @@ fn run() -> Result<()> {
                 println!("must specify a -j/--threads value of 1 or more");
             }
         },
+        #[cfg(unix)]
         ("mount", Some(matches)) => {
             println!("disc: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());
             let f = File::open(matches.value_of("FILE").unwrap()).chain_err(|| "Failed to open file")?;

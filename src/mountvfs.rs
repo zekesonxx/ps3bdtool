@@ -108,12 +108,8 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
         }
         reply.data(&return_buf[offset_from_start as usize..(offset_from_start as usize+size as usize)]);
     }
-    fn open(&mut self, req: &Request, ino: u64, flags: u32, reply: ReplyOpen) {
-        println!("open(req={:?}, ino={}, flags={})", req, ino, flags);
-        reply.error(ENOSYS);
-    }
 }
 
 pub fn mount<F: Read+Seek, P: AsRef<Path>>(disc: PS3Disc<F>, mountpoint: P) {
-    fuse::mount(DecryptFilesystem::new(disc), &mountpoint, &[OsStr::new("default_permissions"), OsStr::new("user_allow_other"), OsStr::new("allow_other"), OsStr::new("allow_root")]).unwrap();
+    fuse::mount(DecryptFilesystem::new(disc), &mountpoint, &[]).unwrap();
 }

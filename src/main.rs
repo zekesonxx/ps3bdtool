@@ -92,7 +92,7 @@ fn run() -> Result<()> {
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
-            //(@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
+            (@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
         ));
     }
     let matches = app.get_matches();
@@ -157,6 +157,10 @@ fn run() -> Result<()> {
             let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
             let mut writer = BufWriter::new(fout);
 
+            if let Some(ird_path) = matches.value_of("irdfile") {
+                let parsed = ird::read_ird(ird_path)?;
+                disc.import_from_ird(parsed)?;
+            }
 
             if matches.is_present("d1") && matches.is_present("key") {
                 println!("warning: --key takes precedence over --d1");
@@ -174,10 +178,9 @@ fn run() -> Result<()> {
             // Gracefully and helpfully fail if we don't have a disc_key
             // rather than throwing an error later because there's no disc_key.
             if !disc.can_decrypt() {
-                println!("No 3k3y header found, and no d1 or disc key specified!");
+                println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
                 println!("Disc can't be decrypted without any of those.");
-                println!("Consider passing a value to --key or --d1");
-                //TODO ird files
+                println!("Consider passing a value to --d1 or --ird");
                 return Ok(());
             }
             if let Some(d1) = disc.d1 {
@@ -267,6 +270,11 @@ fn run() -> Result<()> {
 
             let mut disc = disc::PS3Disc::new(reader)?;
 
+            if let Some(ird_path) = matches.value_of("irdfile") {
+                let parsed = ird::read_ird(ird_path)?;
+                disc.import_from_ird(parsed)?;
+            }
+
             if matches.is_present("d1") && matches.is_present("key") {
                 println!("warning: --key takes precedence over --d1");
             }
@@ -285,15 +293,20 @@ fn run() -> Result<()> {
         ("irdinfo", Some(matches)) => {
             println!("file: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());
             let parsed = ird::read_ird(matches.value_of("FILE").unwrap())?;
-            println!("{:?}", parsed);
-            for hash in parsed.region_hashes {
-                print!("hash: ");
-                hex_println!(hash.as_ref());
-            }
+            println!("IRDv{} file for {} - {}", parsed.version, parsed.game_id, parsed.game_name);
+            println!("versions: {} game, {} app, {} update", parsed.game_ver, parsed.app_ver, parsed.update_ver);
+
             print!("data1: ");
             hex_println!(parsed.data1.as_ref());
             print!("data2: ");
             hex_println!(parsed.data2.as_ref());
+
+            println!();
+            println!("Region MD5 hashes:");
+            for hash in parsed.region_hashes {
+                print!("hash: ");
+                hex_println!(hash.as_ref());
+            }
         }
         (_, _) => unreachable!()
     }

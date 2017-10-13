@@ -2,9 +2,9 @@
 
 ### Infrastructure
 * Multithreaded decrypts as a module
-* 3k3y IRD files
-  * Parsing, print info, check crc32
-  * Getting d1 keys out
+* ~~3k3y IRD files~~ DONE
+  * ~~Parsing, print info,~~ DONE, check crc32
+  * ~~Getting d1 keys out~~ DONE
   * Checking an ISO and/or folder against the hash list
 * Move sector decryption checking to multithreading code,
   avoid pointless Vec allocation in decrypt_sector for unencrypted sectors

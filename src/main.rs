@@ -46,6 +46,15 @@ use errors::*;
 
 quick_main!(run);
 
+macro_rules! hex_println {
+    ($a: expr) => {
+        for &byte in $a {
+            print!("{:02X}", byte);
+        }
+        println!();
+    };
+}
+
 fn run() -> Result<()> {
     let mut app: clap::App = clap_app!(ps3bdtool =>
         (@setting ArgRequiredElseHelp)
@@ -97,15 +106,9 @@ fn run() -> Result<()> {
                 println!("{}", disc.gameid);
             } else if matches.is_present("keys") {
                 print!("      d1: ");
-                for &byte in disc.d1.unwrap().as_ref() {
-                    print!("{:02X}", byte);
-                }
-                println!();
+                hex_println!(disc.d1.unwrap().as_ref());
                 print!("disc_key: ");
-                for &byte in disc.disc_key.unwrap().as_ref() {
-                    print!("{:02X}", byte);
-                }
-                println!();
+                hex_println!(disc.disc_key.unwrap().as_ref());
             } else {
                 //TODO get the game name
                 println!("{filename}: {gameid}, {bytes}, {regions} regions",
@@ -179,16 +182,10 @@ fn run() -> Result<()> {
             }
             if let Some(d1) = disc.d1 {
                 print!("using d1: ");
-                for &byte in d1.as_ref() {
-                    print!("{:02X}", byte);
-                }
-                println!();
+                hex_println!(d1.as_ref());
             }
             print!("{} disc key: ", if disc.d1.is_some() {"calculated"} else {"using"});
-            for &byte in disc.disc_key.unwrap().as_ref() {
-                print!("{:02X}", byte);
-            }
-            println!();
+            hex_println!(disc.disc_key.unwrap().as_ref());
 
 
             println!("sectors: {sectors} ({size}), regions: {regions}",
@@ -291,21 +288,12 @@ fn run() -> Result<()> {
             println!("{:?}", parsed);
             for hash in parsed.region_hashes {
                 print!("hash: ");
-                for &byte in hash.as_ref() {
-                    print!("{:02X}", byte);
-                }
-                println!();
+                hex_println!(hash.as_ref());
             }
             print!("data1: ");
-            for &byte in parsed.data1.as_ref() {
-                print!("{:02X}", byte);
-            }
-            println!();
+            hex_println!(parsed.data1.as_ref());
             print!("data2: ");
-            for &byte in parsed.data2.as_ref() {
-                print!("{:02X}", byte);
-            }
-            println!();
+            hex_println!(parsed.data2.as_ref());
         }
         (_, _) => unreachable!()
     }

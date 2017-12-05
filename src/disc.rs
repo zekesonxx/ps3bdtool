@@ -162,7 +162,7 @@ impl<F: Read+Seek> PS3Disc<F> {
                 buf[1905] = b'e';
             }
 
-            Ok(buf.to_owned())
+            Ok(buf.to_vec())
         }
     }
 
@@ -175,7 +175,7 @@ impl<F: Read+Seek> PS3Disc<F> {
         &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
             .chain_err(|| "failed to seek")?;
         &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
-        Ok(buf.to_owned())
+        Ok(buf.to_vec())
     }
 
     /// Returns a standalone struct that can be used to decrypt individual sectors.

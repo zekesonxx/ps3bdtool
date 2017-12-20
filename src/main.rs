@@ -75,7 +75,7 @@ fn run() -> Result<()> {
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             (@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
-            (@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
+            (@arg irdfile: --ird +takes_value "IRD file to extract key from")
         )
         (@subcommand irdinfo =>
             (about: "Print information about a 3k3y IRD file")
@@ -92,7 +92,7 @@ fn run() -> Result<()> {
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
-            (@arg irdfile: --ird +takes_value "IRD file to extract key from (not implemented)")
+            (@arg irdfile: --ird +takes_value "IRD file to extract key from")
         ));
     }
     let matches = app.get_matches();
@@ -105,10 +105,16 @@ fn run() -> Result<()> {
             if matches.is_present("id") {
                 println!("{}", disc.gameid);
             } else if matches.is_present("keys") {
-                print!("      d1: ");
-                hex_println!(disc.d1.unwrap().as_ref());
-                print!("disc_key: ");
-                hex_println!(disc.disc_key.unwrap().as_ref());
+                if let Some(disc_key) = disc.disc_key {
+                    if let Some(d1) = disc.d1 {
+                        print!("      d1: ");
+                        hex_println!(d1.as_ref());
+                    }
+                    print!("disc_key: ");
+                    hex_println!(disc_key.as_ref());
+                } else {
+                    println!("No keys present");
+                }
             } else {
                 //TODO get the game name
                 println!("{filename}: {gameid}, {bytes}, {regions} regions",
@@ -127,6 +133,9 @@ fn run() -> Result<()> {
                 }
                 println!("https://rpcs3.net/compatibility?g={}",
                          disc.gameid.replace('-', ""));
+                if let Some(tagline) = disc.tagline_3k3y {
+                    println!("3k3y tagline present: \"{}\"", tagline);
+                }
             }
         },
         ("decrypt", Some(matches)) => {

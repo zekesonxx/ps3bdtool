@@ -239,8 +239,18 @@ fn run() -> Result<()> {
                                 let (ref mut current_sector, ref mut disc) = *disc.lock().unwrap();
                                 cur_sec = *current_sector;
                                 if *current_sector >= disc.total_sectors {
-                                    tx.send(true).unwrap();
-                                    break;
+                                    // Why are you doing this like this?
+                                    // Well, we need to inform the main thread that we're done
+                                    // But if this thread isn't the first to inform,
+                                    // then the mpsc channel will have already been dropped,
+                                    // causing a panic:
+                                    // > thread '<unnamed>' panicked at 'called `Result::unwrap()`
+                                    // > on an `Err` value: "SendError(..)"'
+                                    // This throws out the result in a way rustc is happy with.
+                                    // (no unused_must_use warning)
+                                    match tx.send(true) {
+                                        _ => break
+                                    };
                                 } else {
                                     tx.send(false).unwrap();
                                 }

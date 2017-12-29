@@ -81,6 +81,7 @@ fn run() -> Result<()> {
             (about: "Print information about a 3k3y IRD file")
             (@setting ArgRequiredElseHelp)
             (@arg FILE: +required "Path to 3k3y IRD file")
+            (@arg filehashes: --filehashes "Print file inode numbers and their hashes")
         )
     );
     if cfg!(unix) {
@@ -313,20 +314,30 @@ fn run() -> Result<()> {
         ("irdinfo", Some(matches)) => {
             println!("file: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());
             let parsed = ird::read_ird(matches.value_of("FILE").unwrap())?;
-            println!("IRDv{} file for {} - {}", parsed.version, parsed.game_id, parsed.game_name);
-            println!("versions: {} game, {} app, {} update", parsed.game_ver, parsed.app_ver, parsed.update_ver);
+            if matches.is_present("filehashes") {
+                for hash in parsed.file_hashes {
+                    print!("{}: ", hash.0);
+                    hex_println!(hash.1.as_ref());
+                }
+            } else {
+                println!("IRDv{} file for {} - {}", parsed.version, parsed.game_id, parsed.game_name);
+                println!("versions: {} game, {} app, {} update", parsed.game_ver, parsed.app_ver, parsed.update_ver);
 
-            print!("data1: ");
-            hex_println!(parsed.data1.as_ref());
-            print!("data2: ");
-            hex_println!(parsed.data2.as_ref());
+                print!("data1: ");
+                hex_println!(parsed.data1.as_ref());
+                print!("data2: ");
+                hex_println!(parsed.data2.as_ref());
 
-            println!();
-            println!("Region MD5 hashes:");
-            for hash in parsed.region_hashes {
-                print!("hash: ");
-                hex_println!(hash.as_ref());
+                println!();
+                println!("Region MD5 hashes:");
+                let mut i = 0;
+                for hash in parsed.region_hashes {
+                    print!("Region {}: ", i);
+                    hex_println!(hash.as_ref());
+                    i += 1;
+                }
             }
+
         }
         (_, _) => unreachable!()
     }

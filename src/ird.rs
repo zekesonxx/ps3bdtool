@@ -16,6 +16,7 @@ pub struct IRDFile {
     pub header_comp: Vec<u8>,
     pub footer_comp: Vec<u8>,
     pub region_hashes: Vec<[u8; 16]>,
+    pub file_hashes: Vec<(i64, [u8; 16])>,
     pub pic_data: Vec<u8>, //TODO: switch to [u8; 0x73] when practical, Rust 1.21?
     pub data1: [u8; 16],
     pub data2: [u8; 16],
@@ -43,7 +44,7 @@ named!(pub parse_ird<IRDFile>, do_parse!(
     footerlen: le_u32 >>
     footer_comp: take!(footerlen) >>
     region_hashes: length_count!(be_u8, u8_16) >> //region MD5 hashes
-    length_count!(le_i32, tuple!(le_i64, u8_16)) >> // file MD5 hashes, thrown out for now.
+    file_hashes: length_count!(le_i32, tuple!(le_i64, u8_16)) >> // file MD5 hashes, thrown out for now.
     take!(4) >> //no joke, there's literally two ReadUInt16()s in a row here that don't feed to anything.
     pic_data: take!(0x73) >> //TODO: version gate behind ver>=9
     data1: u8_16 >>
@@ -60,6 +61,7 @@ named!(pub parse_ird<IRDFile>, do_parse!(
         app_ver: app_ver.to_string(),
         header_comp: header_comp.to_owned(),
         footer_comp: footer_comp.to_owned(),
+        file_hashes: file_hashes.to_owned(),
         region_hashes: region_hashes.to_owned(),
         pic_data: pic_data.to_owned()
     })

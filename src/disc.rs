@@ -238,6 +238,11 @@ impl<F: Read+Seek> PS3Disc<F> {
         }
         self.set_d1(ird_file.data1.as_ref()).chain_err(|| "Failed to import d1 key from IRD file")
     }
+
+    /// Consumes the PS3Disc and returns the inner object
+    pub fn into_inner(self) -> F {
+        self.reader_handle
+    }
 }
 
 impl PS3DiscDecryptor {

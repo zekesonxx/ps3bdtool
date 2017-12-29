@@ -89,6 +89,7 @@ fn run() -> Result<()> {
             (@setting ArgRequiredElseHelp)
             (@arg FILE: +required "Path to game image or disc drive")
             (@arg MOUNTPOINT: +required "Path to mount to")
+            (@arg verbose: -v --verbose "Output debugging information")
             (@arg d1: -d --d1 +takes_value "Game's d1 value as a string of hex bytes, used to calculate the disc key")
             (@arg key: -k --key +takes_value "Decryption key as a string of hex bytes")
             //(@arg threads: -j --threads +takes_value "Number of threads to decrypt with. Defaults to 1. Set to 1 to switch to singlethreaded mode")
@@ -307,7 +308,7 @@ fn run() -> Result<()> {
                 disc.set_disc_key(disc_key.as_ref())?;
             }
 
-            mountvfs::mount(disc, matches.value_of("MOUNTPOINT").unwrap());
+            mountvfs::mount(disc, matches.value_of("MOUNTPOINT").unwrap(), matches.is_present("verbose"));
         },
         ("irdinfo", Some(matches)) => {
             println!("file: {}", PathBuf::from(matches.value_of("FILE").unwrap()).display());

@@ -9,11 +9,12 @@ use time::Timespec;
 struct DecryptFilesystem<F> {
     disc: PS3Disc<F>,
     root_attr: FileAttr,
-    iso_attr: FileAttr
+    iso_attr: FileAttr,
+    verbose: bool
 }
 
 impl<F: Read+Seek> DecryptFilesystem<F> {
-    fn new (disc: PS3Disc<F>) -> Self {
+    fn new (disc: PS3Disc<F>, verbose: bool) -> Self {
         let ts = Timespec::new(0, 0);
         let root_attr = FileAttr {
             ino: 1,
@@ -48,7 +49,7 @@ impl<F: Read+Seek> DecryptFilesystem<F> {
             flags: 0,
         };
         DecryptFilesystem {
-            disc, root_attr, iso_attr
+            disc, root_attr, iso_attr, verbose
         }
     }
 }
@@ -67,7 +68,9 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
     }
     fn readdir(&mut self, _req: &Request, ino: u64, fh: u64, offset: u64, mut reply: ReplyDirectory) {
         if ino != 1 && fh != 0 && offset != 0 {
-            println!("readdir(ino={}, fh={}, offset={})", ino, fh, offset);
+            if self.verbose {
+                println!("readdir(ino={}, fh={}, offset={})", ino, fh, offset);
+            }
         }
         if ino == 1 {
             if offset == 0 {
@@ -81,7 +84,9 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
         }
     }
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
-        println!("lookup(parent={}, name={:?})", parent, name);
+        if self.verbose {
+            println!("lookup(parent={}, name={:?})", parent, name);
+        }
         if name.to_str().unwrap() == "/" {
             let ttl = Timespec::new(1, 0);
             reply.entry(&ttl, &self.root_attr, 0);
@@ -93,7 +98,9 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
         }
     }
     fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: u64, size: u32, reply: ReplyData) {
-        println!("read(ino={}, fh={}, offset={}, size={})", ino, fh, offset, size);
+        if self.verbose {
+            println!("read(ino={}, fh={}, offset={}, size={})", ino, fh, offset, size);
+        }
         if ino != 2 {
             reply.error(ENOENT);
             return;
@@ -102,7 +109,10 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
         let starting_sector = offset/2048;
         let offset_from_start = offset%2048;
         let ending_sector = (offset+size as u64)/2048;
-        println!("offset: {}, size: {}, starting: {}, offset_from_start: {}, ending: {}", offset, size, starting_sector, offset_from_start, ending_sector);
+        if self.verbose {
+            println!("offset: {}, size: {}, starting: {}, offset_from_start: {}, ending: {}",
+                     offset, size, starting_sector, offset_from_start, ending_sector);
+        }
         for i in starting_sector..ending_sector {
             return_buf.append(&mut self.disc.read_sector(i as u32).unwrap());
         }
@@ -110,6 +120,6 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
     }
 }
 
-pub fn mount<F: Read+Seek, P: AsRef<Path>>(disc: PS3Disc<F>, mountpoint: P) {
-    fuse::mount(DecryptFilesystem::new(disc), &mountpoint, &[]).unwrap();
+pub fn mount<F: Read+Seek, P: AsRef<Path>>(disc: PS3Disc<F>, mountpoint: P, verbose: bool) {
+    fuse::mount(DecryptFilesystem::new(disc, verbose), &mountpoint, &[]).unwrap();
 }

@@ -73,12 +73,15 @@ If you remove a disc while things are running something will probably implode.
 
 ## Misc Notes
 * ps3bdtool is built on the assumption that the bulk of a PS3 disc will be encrypted,
-  and as such priority should be given to decryption speed, not raw transfer speed.  
-  This is mentioned because if you have a disc that is largely unencrypted,
-  ps3bdtool will be slower than dd or similar due to ps3bdtool's excessive buffering.  
+  and as such priority should be given to decryption speed, not raw transfer speed.
+  Meaning, if you have a disc that is largely unencrypted,
+  ps3bdtool will be slower than dd or similar due to ps3bdtool's excessive buffering. 
   As only the basic disc info and update files are unencrypted on basically every retail
   disc, this assumption is probably a reasonable one.
 * The FUSE mount has no explicit caching at all. We're relying on the kernel to avoid excessive reads here.
+* I suggest 3 threads for decryption above because 3 threads is enough that, with my (reasonably old) quad-core
+  i5-2320 reading from an LG WH16NS40 and writing to an SSD, I/O speed becomes the bottleneck.
+* FUSE mounting doesn't support multithreaded decoding (yet). 
 
 
 ## License

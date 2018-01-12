@@ -14,10 +14,14 @@ extern crate flate2;
 #[cfg(unix)] extern crate fuse;
 #[cfg(unix)] extern crate libc;
 
+// XDG config dir support
+#[cfg(unix)] extern crate xdg;
+
 pub mod sector;
 pub mod disc;
 pub mod decrypt;
 #[cfg(unix)] pub mod mountvfs;
+#[cfg(unix)] pub mod config;
 pub mod ird;
 
 use std::fs::File;
@@ -104,6 +108,9 @@ fn run() -> Result<()> {
             let reader = BufReader::new(f);
 
             let disc = disc::PS3Disc::new(reader)?;
+            if let Some(path) = config::find_ird_file(disc.gameid.replace('-', "").as_ref()).chain_err(||"argh")? {
+                println!("IRD file found: {:?}", path);
+            }
             if matches.is_present("id") {
                 println!("{}", disc.gameid);
             } else if matches.is_present("keys") {

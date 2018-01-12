@@ -26,7 +26,7 @@ pub mod ird;
 
 use std::fs::File;
 use std::path::PathBuf;
-use std::io::{BufReader, BufWriter, Write, Seek, SeekFrom};
+use std::io::{BufReader, BufWriter, Read, Write, Seek, SeekFrom};
 use std::ffi::OsStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -57,6 +57,47 @@ macro_rules! hex_println {
         }
         println!();
     };
+}
+
+fn find_key_if_possible<F: Read+Seek>(disc: &mut disc::PS3Disc<F>, matches: &clap::ArgMatches) -> Result<bool> {
+    // Check if a IRD file has been passed on the command line
+    if matches.is_present("irdfile") && (matches.is_present("d1") || matches.is_present("key")) {
+        println!("warning: --ird takes precedence over --key/--d1");
+    }
+
+    if let Some(ird_path) = matches.value_of("irdfile") {
+        let parsed = ird::read_ird(ird_path)?;
+        disc.import_from_ird(parsed)?;
+        return Ok(true);
+    }
+
+
+    // Check if the user passed us --d1 and/or --key, and set them accordingly
+    if matches.is_present("d1") && matches.is_present("key") {
+        println!("warning: --key takes precedence over --d1");
+    }
+
+    if let Some(key) = matches.value_of("key") {
+        let disc_key: Vec<u8> = FromHex::from_hex(key.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
+        disc.set_disc_key(disc_key.as_ref())?;
+        return Ok(true);
+    } else if let Some(d1) = matches.value_of("d1") {
+        let d1: Vec<u8> = FromHex::from_hex(d1.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
+        disc.set_d1(d1.as_ref())?;
+        return Ok(true);
+    }
+
+
+    // If nothing was specified by the user, check their folders for it.
+    if let Some(ird_path) = config::find_ird_file(disc.gameid.replace('-', "").as_ref()).chain_err(||"argh")? {
+        let parsed = ird::read_ird(ird_path)?;
+        disc.import_from_ird(parsed)?;
+        return Ok(true);
+    }
+
+
+    // If nothing worked, give up
+    Ok(false)
 }
 
 fn run() -> Result<()> {
@@ -108,9 +149,6 @@ fn run() -> Result<()> {
             let reader = BufReader::new(f);
 
             let disc = disc::PS3Disc::new(reader)?;
-            if let Some(path) = config::find_ird_file(disc.gameid.replace('-', "").as_ref()).chain_err(||"argh")? {
-                println!("IRD file found: {:?}", path);
-            }
             if matches.is_present("id") {
                 println!("{}", disc.gameid);
             } else if matches.is_present("keys") {
@@ -175,32 +213,14 @@ fn run() -> Result<()> {
             let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
             let mut writer = BufWriter::new(fout);
 
-            if let Some(ird_path) = matches.value_of("irdfile") {
-                let parsed = ird::read_ird(ird_path)?;
-                disc.import_from_ird(parsed)?;
-            }
-
-            if matches.is_present("d1") && matches.is_present("key") {
-                println!("warning: --key takes precedence over --d1");
-            }
-            // Check if the user passed us --d1 and/or --key, and set them accordingly
-            if let Some(d1) = matches.value_of("d1") {
-                let d1: Vec<u8> = FromHex::from_hex(d1.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
-                disc.set_d1(d1.as_ref())?;
-            }
-            if let Some(key) = matches.value_of("key") {
-                let disc_key: Vec<u8> = FromHex::from_hex(key.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
-                disc.set_disc_key(disc_key.as_ref())?;
-            }
-
-            // Gracefully and helpfully fail if we don't have a disc_key
-            // rather than throwing an error later because there's no disc_key.
-            if !disc.can_decrypt() {
+            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? || !disc.can_decrypt() {
                 println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
                 println!("Disc can't be decrypted without any of those.");
                 println!("Consider passing a value to --d1 or --ird");
                 return Ok(());
             }
+
+
             if let Some(d1) = disc.d1 {
                 print!("using d1: ");
                 hex_println!(d1.as_ref());
@@ -298,22 +318,11 @@ fn run() -> Result<()> {
 
             let mut disc = disc::PS3Disc::new(reader)?;
 
-            if let Some(ird_path) = matches.value_of("irdfile") {
-                let parsed = ird::read_ird(ird_path)?;
-                disc.import_from_ird(parsed)?;
-            }
-
-            if matches.is_present("d1") && matches.is_present("key") {
-                println!("warning: --key takes precedence over --d1");
-            }
-            // Check if the user passed us --d1 and/or --key, and set them accordingly
-            if let Some(d1) = matches.value_of("d1") {
-                let d1: Vec<u8> = FromHex::from_hex(d1.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
-                disc.set_d1(d1.as_ref())?;
-            }
-            if let Some(key) = matches.value_of("key") {
-                let disc_key: Vec<u8> = FromHex::from_hex(key.as_bytes().to_owned()).chain_err(|| "failed to parse key")?;
-                disc.set_disc_key(disc_key.as_ref())?;
+            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? || !disc.can_decrypt() {
+                println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
+                println!("Disc can't be decrypted without any of those.");
+                println!("Consider passing a value to --d1 or --ird");
+                return Ok(());
             }
 
             mountvfs::mount(disc, matches.value_of("MOUNTPOINT").unwrap(), matches.is_present("verbose"));

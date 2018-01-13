@@ -66,7 +66,7 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
             reply.error(ENOENT);
         }
     }
-    fn readdir(&mut self, _req: &Request, ino: u64, fh: u64, offset: u64, mut reply: ReplyDirectory) {
+    fn readdir(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, mut reply: ReplyDirectory) {
         if ino != 1 && fh != 0 && offset != 0 {
             if self.verbose {
                 println!("readdir(ino={}, fh={}, offset={})", ino, fh, offset);
@@ -97,7 +97,7 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
             reply.error(ENOENT);
         }
     }
-    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: u64, size: u32, reply: ReplyData) {
+    fn read(&mut self, _req: &Request, ino: u64, fh: u64, offset: i64, size: u32, reply: ReplyData) {
         if self.verbose {
             println!("read(ino={}, fh={}, offset={}, size={})", ino, fh, offset, size);
         }
@@ -108,7 +108,7 @@ impl<F: Read+Seek> Filesystem for DecryptFilesystem<F> {
         let mut return_buf: Vec<u8> = Vec::with_capacity(size as usize+2048);
         let starting_sector = offset/2048;
         let offset_from_start = offset%2048;
-        let ending_sector = (offset+size as u64)/2048;
+        let ending_sector = (offset+size as i64)/2048;
         if self.verbose {
             println!("offset: {}, size: {}, starting: {}, offset_from_start: {}, ending: {}",
                      offset, size, starting_sector, offset_from_start, ending_sector);

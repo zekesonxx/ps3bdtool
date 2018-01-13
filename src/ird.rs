@@ -70,7 +70,7 @@ named!(pub parse_ird<IRDFile>, do_parse!(
 pub fn read_ird<P: AsRef<Path>>(fpath: P) -> Result<IRDFile> {
     let f = File::open(fpath).chain_err(|| "Failed to open IRD file")?;
     let reader = BufReader::new(f);
-    let mut reader = GzDecoder::new(reader).chain_err(|| "Failed to decompress IRD file")?;
+    let mut reader = GzDecoder::new(reader);
     let mut buf = vec![];
     reader.read_to_end(&mut buf).chain_err(|| "Failed to read IRD file")?;
 

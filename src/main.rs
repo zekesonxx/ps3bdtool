@@ -21,7 +21,7 @@ pub mod sector;
 pub mod disc;
 pub mod decrypt;
 #[cfg(unix)] pub mod mountvfs;
-#[cfg(unix)] pub mod config;
+pub mod config;
 pub mod ird;
 
 use std::fs::File;
@@ -213,7 +213,7 @@ fn run() -> Result<()> {
             let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
             let mut writer = BufWriter::new(fout);
 
-            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? || !disc.can_decrypt() {
+            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
                 println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
                 println!("Disc can't be decrypted without any of those.");
                 println!("Consider passing a value to --d1 or --ird");
@@ -318,7 +318,7 @@ fn run() -> Result<()> {
 
             let mut disc = disc::PS3Disc::new(reader)?;
 
-            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? || !disc.can_decrypt() {
+            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
                 println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
                 println!("Disc can't be decrypted without any of those.");
                 println!("Consider passing a value to --d1 or --ird");

@@ -1,6 +1,6 @@
 use super::errors::*;
-use xdg;
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::fs::{read_dir, DirEntry};
 
 /// Automatically find an IRD file to use
@@ -9,7 +9,9 @@ use std::fs::{read_dir, DirEntry};
 ///
 /// so, probably, `~/.local/share/ps3bdtool/ird_files/`
 ///
+#[cfg(unix)]
 pub fn find_ird_file(gameid: &str) -> Result<Option<PathBuf>> {
+    use xdg;
     let xdg_dirs: xdg::BaseDirectories = xdg::BaseDirectories::with_prefix("ps3bdtool").chain_err(|| "Failed to get base directories")?;
     let ird_dir = xdg_dirs.create_data_directory("ird_files").chain_err(|| "Failed to get ird files directory")?;
     for file in read_dir(ird_dir).chain_err(||"failed to read directory")? {
@@ -20,5 +22,11 @@ pub fn find_ird_file(gameid: &str) -> Result<Option<PathBuf>> {
             return Ok(Some(dir_entry.path()))
         }
     }
+    Ok(None)
+}
+
+#[cfg(not(unix))]
+#[allow(unused_variables)]
+pub fn find_ird_file(gameid: &str) -> Result<Option<PathBuf>> {
     Ok(None)
 }

@@ -56,19 +56,27 @@ and I can't be arsed to write one yet.
 
 1. Get an IRD file for the disc, see above.
 2. Make an empty folder somewhere, we'll call it `$MOUNTPOINT`.
-   * We won't actually store anything here, but it has to exist, be read+writable by root, and be empty.
+   * We won't actually store anything here, but it has to exist and be empty.
 3. Make an empty folder in `$RPCS3/dev_hdd0/disc`, ex `$RPCS3/dev_hdd0/disc/discgame` 
-3. Running as root, run `ps3bdtool mount --ird path/to/the/irdfile.ird /dev/sr0 $MOUNTPOINT`
-   * You have to run as root due to issues with FUSE and other users reading FUSE mounts.
-4. Then, also as root, run `mount -o loop $MOUNTPOINT/GameDisc.iso $RPCS3/dev_hdd0/disc/discgame`
+3. Run `ps3bdtool mount --ird path/to/the/irdfile.ird /dev/sr0 $MOUNTPOINT`  
+4. Then, to actually mount the game, run `fuseiso $MOUNTPOINT/GameDisc.iso $RPCS3/dev_hdd0/disc/discgame`
 5. Open rpcs3 and run your game!
 
 I've tested this with several games and it seems to work alright.
 It's convoluted and annoying, but it works.
 
-You need to stop both processes, then (as root) run `fusermount -u $MOUNTPOINT` to clean up or switch discs.
+You'll need to `fusermount -u` the fuseiso mount, and then `fusermount -u` the game disc mount.
 
 If you remove a disc while things are running something will probably implode.
+
+### How ps3bdtool finds decryption keys
+ps3bdtool goes through a chain to find the decryption key, that is as follows:
+
+1. A 3k3y-injected header on the disc, at the end of the second sector.
+2. `--ird`, `--key`, or `--d1` options passed on the command line, with precedence in that order.
+3. Looking for an IRD file containing the game ID in `$XDG_DATA_HOME/ps3bdtool/ird_files`
+  * So, if you're trying to decrypt an American Red Dead Redemption release, it'll look for any file containing `BLUS30418` in the filename.
+    If you got the IRD file from jonnysp, this file will be named `BLUS30418-501E79332EEF57D0B64186826CD15D65.ird`. 
 
 
 ## Misc Notes
@@ -81,7 +89,7 @@ If you remove a disc while things are running something will probably implode.
 * The FUSE mount has no explicit caching at all. We're relying on the kernel to avoid excessive reads here.
 * I suggest 3 threads for decryption above because 3 threads is enough that, with my (reasonably old) quad-core
   i5-2320 reading from an LG WH16NS40 and writing to an SSD, I/O speed becomes the bottleneck.
-* FUSE mounting doesn't support multithreaded decoding (yet). 
+* FUSE mounting doesn't support multithreaded decryption, and probably won't ever because I don't care enough. 
 
 
 ## License

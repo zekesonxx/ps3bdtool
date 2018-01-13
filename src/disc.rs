@@ -1,4 +1,8 @@
 
+// Make clippy shut up about the 0x000000FF and friends
+// in the decryption code
+#![allow(unreadable_literal)]
+
 use super::errors::*;
 use sector::{Region, VecRegion};
 use std::io::{Read, Seek, SeekFrom};
@@ -14,7 +18,7 @@ fn be_u32(i: &[u8]) -> u32 {
 
 /// Wrapped PS3 disc
 ///
-/// Using read_sector, will transparently decrypt sectors as needed.
+/// Using `read_sector`, will transparently decrypt sectors as needed.
 #[derive(Debug)]
 pub struct PS3Disc<F> {
     /// Encrypted and unencrypted areas of the disc, specified by sectors.
@@ -38,7 +42,7 @@ pub struct PS3Disc<F> {
 /// Standalone struct to decrypt PS3 disc regions
 ///
 /// This only requires an immutable reference to decrypt a region,
-/// and while so does PS3Disc, it's also being used mutably to read sectors.
+/// and while so does `PS3Disc`, it's also being used mutably to read sectors.
 ///
 /// This make it a lot easier do multithreaded decrypts.
 #[derive(Debug, Clone)]
@@ -76,7 +80,7 @@ impl<F: Read+Seek> PS3Disc<F> {
         // Get the 3k3y tagline, if it exists.
         // This immediately proceeds the ird-injected d1 key, which is used to generate the disc key
         let f70 = &header[0xF70..(0xF70+16)];
-        let tagline_3k3y = if f70 == &[0u8; 16] {
+        let tagline_3k3y = if f70 == [0u8; 16] {
             None
         } else {
             Some(String::from_utf8_lossy(f70).to_string())
@@ -132,11 +136,12 @@ impl<F: Read+Seek> PS3Disc<F> {
     ///
     /// Remember that sector is 0 indexed, so the first sector is #0.
     #[allow(non_snake_case)]
+    #[allow(identity_op)]
     pub fn read_sector(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
-        &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
+        self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
             .chain_err(|| "failed to seek")?;
-        &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
+        self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
 
         if self.regions.region_for_sector(sector).unwrap().encrypted {
             if let Some(disc_key) = self.disc_key {
@@ -172,9 +177,9 @@ impl<F: Read+Seek> PS3Disc<F> {
     /// Generally speaking, you only want to use this to then feed into a PS3DiscDecryptor
     pub fn read_sector_raw(&mut self, sector: u32) -> Result<Vec<u8>> {
         let mut buf = [0u8; 2048];
-        &self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
+        self.reader_handle.seek(SeekFrom::Start((sector as u64)*2048))
             .chain_err(|| "failed to seek")?;
-        &self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
+        self.reader_handle.read_exact(&mut buf).chain_err(|| "failed to read")?;
         Ok(buf.to_vec())
     }
 
@@ -232,7 +237,7 @@ impl<F: Read+Seek> PS3Disc<F> {
     /// Safely import a d1 key from an IRD file
     ///
     /// This function will compute the disc key on execution.
-    pub fn import_from_ird(&mut self, ird_file: IRDFile) -> Result<()> {
+    pub fn import_from_ird(&mut self, ird_file: &IRDFile) -> Result<()> {
         if ird_file.data1 == [0; 16] {
             bail!("IRD file appears to be corrupted, its d1 key is zeroed!");
         }
@@ -252,6 +257,7 @@ impl PS3DiscDecryptor {
     /// is functionally identical to
     /// `ps3disc.read_sector(4)`
     #[allow(non_snake_case)]
+    #[allow(identity_op)]
     pub fn decrypt_sector(&self, buf: &[u8], sector: u32) -> Result<Vec<u8>> {
         if buf.len() != 2048 {
             bail!("PS3 disc sectors are always exactly 2048 bytes. No partial decrypts.");
@@ -263,7 +269,7 @@ impl PS3DiscDecryptor {
             iV[13] = ((sector & 0x00FF0000)>>16) as u8;
             iV[14] = ((sector & 0x0000FF00)>> 8) as u8;
             iV[15] = ((sector & 0x000000FF)>> 0) as u8;
-            decrypt::aes_decrypt(&buf, &self.disc_key, &iV)
+            decrypt::aes_decrypt(buf, &self.disc_key, &iV)
         } else {
             let mut buf = buf.to_owned();
             if sector == 1 && self.has_3k3y_tagline {

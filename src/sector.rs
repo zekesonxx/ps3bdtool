@@ -6,7 +6,7 @@ use std::fmt;
 ///
 /// These are sector numbers, inclusive, representing encrypted or decrypted sectors.
 ///
-/// Used internally by PS3Disc.
+/// Used internally by `PS3Disc`.
 #[derive(Clone, Copy)]
 pub struct Region {
     /// Number of the region, starting from 0
@@ -48,6 +48,6 @@ impl VecRegion for Vec<Region> {
                 return Some(range);
             }
         }
-        return None;
+        None
     }
 }

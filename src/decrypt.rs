@@ -22,7 +22,7 @@ pub fn aes_encrypt(data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u8>> {
             Err(e) => return Err(Error::from_kind(ErrorKind::SymmetricCipherError(e)))
         };
 
-        final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+        final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().cloned());
 
         match result {
             BufferResult::BufferUnderflow => break,
@@ -51,7 +51,7 @@ pub fn aes_decrypt(encrypted_data: &[u8], key: &[u8], iv: &[u8]) -> Result<Vec<u
             Ok(k) => k,
             Err(e) => return Err(Error::from_kind(ErrorKind::SymmetricCipherError(e)))
         };
-        final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().map(|&i| i));
+        final_result.extend(write_buffer.take_read_buffer().take_remaining().iter().cloned());
         match result {
             BufferResult::BufferUnderflow => break,
             BufferResult::BufferOverflow => { }

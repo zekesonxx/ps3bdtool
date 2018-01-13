@@ -1,3 +1,7 @@
+// Clippy lints
+#![allow(unknown_lints)]
+#![allow(cast_lossless)]
+
 // `error_chain!` can recurse deeply
 #![recursion_limit = "1024"]
 
@@ -67,7 +71,7 @@ fn find_key_if_possible<F: Read+Seek>(disc: &mut disc::PS3Disc<F>, matches: &cla
 
     if let Some(ird_path) = matches.value_of("irdfile") {
         let parsed = ird::read_ird(ird_path)?;
-        disc.import_from_ird(parsed)?;
+        disc.import_from_ird(&parsed)?;
         return Ok(true);
     }
 
@@ -91,7 +95,7 @@ fn find_key_if_possible<F: Read+Seek>(disc: &mut disc::PS3Disc<F>, matches: &cla
     // If nothing was specified by the user, check their folders for it.
     if let Some(ird_path) = config::find_ird_file(disc.gameid.replace('-', "").as_ref()).chain_err(||"argh")? {
         let parsed = ird::read_ird(ird_path)?;
-        disc.import_from_ird(parsed)?;
+        disc.import_from_ird(&parsed)?;
         return Ok(true);
     }
 
@@ -213,7 +217,7 @@ fn run() -> Result<()> {
             let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
             let mut writer = BufWriter::new(fout);
 
-            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
+            if !find_key_if_possible(&mut disc, matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
                 println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
                 println!("Disc can't be decrypted without any of those.");
                 println!("Consider passing a value to --d1 or --ird");
@@ -257,7 +261,7 @@ fn run() -> Result<()> {
                 let (tx, rx) = mpsc::channel();
 
                 for _ in 0..threads {
-                    let (writer, disc, tx) = (writer.clone(), disc.clone(), tx.clone());
+                    let (writer, disc, tx) = (Arc::clone(&writer), Arc::clone(&disc), tx.clone());
                     let decryptor = decryptor.clone();
                     thread::spawn(move || {
                         let mut encrypted: Vec<u8>; //TODO switch one or both of these to [u8; 2048]?
@@ -318,7 +322,7 @@ fn run() -> Result<()> {
 
             let mut disc = disc::PS3Disc::new(reader)?;
 
-            if !find_key_if_possible(&mut disc, &matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
+            if !find_key_if_possible(&mut disc, matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
                 println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
                 println!("Disc can't be decrypted without any of those.");
                 println!("Consider passing a value to --d1 or --ird");

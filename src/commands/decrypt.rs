@@ -36,7 +36,7 @@ pub fn decrypt_disc(matches: &::clap::ArgMatches) -> Result<()> {
 
     println!("output: {}", output_path.display());
     let fout = File::create(output_path).chain_err(|| "Failed to create file")?;
-    let mut writer = BufWriter::new(fout);
+
 
     if !super::find_key_if_possible(&mut disc, matches).chain_err(||"Failed to try and find a key")? && !disc.can_decrypt() {
         println!("No 3k3y header found, and no d1, disc key, or ird file specified!");
@@ -59,8 +59,25 @@ pub fn decrypt_disc(matches: &::clap::ArgMatches) -> Result<()> {
              size=ByteSize::b(disc.total_sectors as usize * 2048).to_string(true),
              regions=disc.regions.len());
 
+    // Check to make sure we have enough free disk space
+    #[cfg(unix)]
+    {
+        use nix::sys::statvfs::vfs::Statvfs;
+        let statvfs = Statvfs::for_fd(&fout).chain_err(|| "failed to check disk space")?;
+        let free_space = (statvfs.f_bavail * statvfs.f_bsize) as usize;
+        let needed_space = disc.total_sectors as usize * 2048;
+        if free_space < needed_space {
+            bail!("need {need} bytes free ({needf}), only have {have} bytes ({havef})",
+                need=needed_space, needf=ByteSize::b(needed_space).to_string(true),
+                have=free_space, havef=ByteSize::b(free_space).to_string(true)
+        );
+            //::std::process::exit(1);
+        }
+    }
+
     // Start the actual decryption/ripping process
 
+    let mut writer = BufWriter::new(fout);
     let threads = matches.value_of("threads").unwrap_or("1").parse::<usize>().unwrap();
     if threads == 1 {
         // Singlethreaded Decrypt

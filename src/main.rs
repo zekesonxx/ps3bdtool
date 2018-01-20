@@ -14,6 +14,9 @@ extern crate hex;
 extern crate time;
 extern crate flate2;
 
+// Free disk space checking
+#[cfg(unix)] extern crate nix;
+
 // FUSE mounting support
 #[cfg(unix)] extern crate fuse;
 #[cfg(unix)] extern crate libc;

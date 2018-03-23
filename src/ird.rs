@@ -74,6 +74,6 @@ pub fn read_ird<P: AsRef<Path>>(fpath: P) -> Result<IRDFile> {
     let mut buf = vec![];
     reader.read_to_end(&mut buf).chain_err(|| "Failed to read IRD file")?;
 
-    let parsed: IRDFile = parse_ird(buf.as_ref()).to_result().chain_err(|| "Failed to parse IRD file")?;
+    let parsed: IRDFile = parse_ird(buf.as_ref()).unwrap().1;
     Ok(parsed)
 }

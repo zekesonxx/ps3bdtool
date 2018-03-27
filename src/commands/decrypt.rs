@@ -62,9 +62,9 @@ pub fn decrypt_disc(matches: &::clap::ArgMatches) -> Result<()> {
     // Check to make sure we have enough free disk space
     #[cfg(unix)]
     {
-        use nix::sys::statvfs::vfs::Statvfs;
-        let statvfs = Statvfs::for_fd(&fout).chain_err(|| "failed to check disk space")?;
-        let free_space = (statvfs.f_bavail * statvfs.f_bsize) as usize;
+        use nix::sys::statvfs::fstatvfs;
+        let statvfs = fstatvfs(&fout).chain_err(|| "failed to check disk space")?;
+        let free_space = (statvfs.blocks() * statvfs.block_size()) as usize;
         let needed_space = disc.total_sectors as usize * 2048;
         if free_space < needed_space {
             bail!("need {need} bytes free ({needf}), only have {have} bytes ({havef})",
